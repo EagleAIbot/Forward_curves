@@ -670,6 +670,120 @@
     .metric-cyan { color: #22d3ee; }
 
     /* ============================================ */
+    /* SPOT MARKET DISPLAY */
+    /* ============================================ */
+    #spot-market-display {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    .spot-label-box {
+      background: rgba(10, 15, 26, 0.9);
+      border: 1px solid rgba(128, 128, 128, 0.5);
+      border-radius: 6px;
+      padding: 4px 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: #999;
+    }
+
+    .spot-label-box.history {
+      border-color: rgba(128, 128, 128, 0.4);
+    }
+
+    .spot-label-box.forward {
+      border-color: rgba(74, 222, 128, 0.4);
+      color: #4ade80;
+    }
+
+    .spot-connector {
+      width: 12px;
+      height: 2px;
+      background: linear-gradient(90deg, #666, #22d3ee);
+    }
+
+    .spot-connector.right {
+      background: linear-gradient(90deg, #22d3ee, #4ade80);
+    }
+
+    .spot-price-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .spot-price-container {
+      background: rgba(10, 15, 26, 0.95);
+      border: 1px solid rgba(34, 211, 238, 0.5);
+      border-radius: 8px;
+      padding: 6px 14px;
+      text-align: center;
+      box-shadow: 0 0 15px rgba(34, 211, 238, 0.15);
+    }
+
+    .spot-price-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      font-family: 'SF Mono', 'Monaco', monospace;
+      letter-spacing: -0.5px;
+    }
+
+    .spot-price-label {
+      font-size: 9px;
+      color: #22d3ee;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+
+    .spot-price-time {
+      font-size: 8px;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    .spot-pointer {
+      width: 2px;
+      height: 8px;
+      background: #22d3ee;
+    }
+
+    .spot-arrow {
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid #22d3ee;
+    }
+
+    .spot-price-flash-up {
+      animation: flashGreen 0.4s ease-out;
+    }
+
+    .spot-price-flash-down {
+      animation: flashRed 0.4s ease-out;
+    }
+
+    @keyframes flashGreen {
+      0% { background-color: rgba(74, 222, 128, 0.4); }
+      100% { background-color: transparent; }
+    }
+
+    @keyframes flashRed {
+      0% { background-color: rgba(248, 113, 113, 0.4); }
+      100% { background-color: transparent; }
+    }
+
+    /* ============================================ */
     /* SIGNAL STATUS BAR */
     /* ============================================ */
     #signal-status-bar {
@@ -1097,22 +1211,13 @@
     <hr style="border-color: #444; margin: 10px 0;">
 
     <div class="control-group inline-group">
-      <label for="intervalSelector">Interval:</label>
+      <label for="intervalSelector" style="font-size: 9px;">Historic Bars:</label>
       <select id="intervalSelector">
         <option value="60">1m</option>
         <option value="300" selected>5m</option>
         <option value="900">15m</option>
         <option value="3600">1h</option>
       </select>
-    </div>
-
-    <div class="control-group inline-group">
-        <label for="timeframeSelector">Timeframe:</label>
-        <select id="timeframeSelector">
-          <option value="1" selected>1-Hour</option>
-          <option value="2">2-Hour</option>
-          <option value="4">4-Hour</option>
-        </select>
     </div>
 
     <div class="control-group">
@@ -1146,7 +1251,7 @@
     <div class="control-group inline-group">
       <label for="showHistoryCheckbox">Show History</label>
       <div class="checkbox-group">
-        <input type="checkbox" id="showHistoryCheckbox" checked>
+        <input type="checkbox" id="showHistoryCheckbox">
       </div>
     </div>
 
@@ -1190,6 +1295,30 @@
       <div id="chart-column">
         <div id="chart-area">
           <button id="toggle-controls-btn">☰</button>
+
+          <!-- Spot Market Display -->
+          <div id="spot-market-display">
+            <div class="spot-label-box history">
+              <span>◄◄</span>
+              <span>History</span>
+            </div>
+            <div class="spot-connector"></div>
+            <div class="spot-price-box">
+              <div class="spot-price-container">
+                <div class="spot-price-value" id="spot-price-value">--</div>
+                <div class="spot-price-label">SPOT</div>
+                <div class="spot-price-time" id="spot-price-time">--:-- UTC</div>
+              </div>
+              <div class="spot-pointer"></div>
+              <div class="spot-arrow"></div>
+            </div>
+            <div class="spot-connector right"></div>
+            <div class="spot-label-box forward">
+              <span>Forward</span>
+              <span>►►</span>
+            </div>
+          </div>
+
           <div id="chart"></div>
         </div>
 
@@ -2729,6 +2858,62 @@
     };
 
     // ============================================
+    // SPOT MARKET DISPLAY MANAGER
+    // ============================================
+    const SpotMarketManager = {
+      lastPrice: null,
+
+      init() {
+        // Listen for V4 curve updates (primary source)
+        document.addEventListener('v4curve:update', (e) => this.updateSpotPrice(e.detail));
+        // Listen for V5 curve updates as backup
+        document.addEventListener('curve:update', (e) => {
+          if (!this.lastPrice) this.updateSpotPrice(e.detail);
+        });
+      },
+
+      updateSpotPrice(curveData) {
+        if (!curveData) return;
+
+        // Get spot price from curve data
+        const spotPrice = curveData.current_price || curveData.anchor_price;
+        if (!spotPrice) return;
+
+        const priceEl = document.getElementById('spot-price-value');
+        const timeEl = document.getElementById('spot-price-time');
+        const containerEl = priceEl?.parentElement;
+
+        if (priceEl) {
+          // Format price with commas
+          const formattedPrice = '$' + spotPrice.toLocaleString('en-US', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          });
+          priceEl.textContent = formattedPrice;
+
+          // Flash animation on price change
+          if (this.lastPrice !== null && containerEl) {
+            containerEl.classList.remove('spot-price-flash-up', 'spot-price-flash-down');
+            void containerEl.offsetWidth; // Force reflow
+            if (spotPrice > this.lastPrice) {
+              containerEl.classList.add('spot-price-flash-up');
+            } else if (spotPrice < this.lastPrice) {
+              containerEl.classList.add('spot-price-flash-down');
+            }
+          }
+          this.lastPrice = spotPrice;
+        }
+
+        if (timeEl) {
+          const now = new Date();
+          const hours = now.getUTCHours().toString().padStart(2, '0');
+          const mins = now.getUTCMinutes().toString().padStart(2, '0');
+          timeEl.textContent = hours + ':' + mins + ' UTC';
+        }
+      }
+    };
+
+    // ============================================
     // MAIN INITIALIZATION
     // ============================================
     document.addEventListener('DOMContentLoaded', () => {
@@ -2738,6 +2923,7 @@
       const chartAreaElement = document.getElementById('chart-area');
 
       // Initialize managers
+      SpotMarketManager.init();
       SpreadMatrixManager.init();
       CalculatorManager.init();
       AssetSelectorManager.init();
