@@ -1,0 +1,43 @@
+# Forward Curve Hub - systemd Service
+# 
+# Installation:
+#   sudo cp forward-curve-hub.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable forward-curve-hub
+#   sudo systemctl start forward-curve-hub
+#
+# Check status:
+#   sudo systemctl status forward-curve-hub
+#   sudo journalctl -u forward-curve-hub -f
+
+[Unit]
+Description=Forward Curve Hub - Institutional Forward Curve Visualization
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/forward-curve-hub
+Environment=PATH=/opt/forward-curve-hub/venv/bin:/usr/bin
+Environment=PORT=8766
+Environment=HOST=0.0.0.0
+ExecStart=/opt/forward-curve-hub/venv/bin/python server/ipc_ui_server.py --port 8766
+Restart=always
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/forward-curve-hub
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=forward-curve-hub
+
+[Install]
+WantedBy=multi-user.target
+

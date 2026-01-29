@@ -1,0 +1,30 @@
+# Forward Curve Hub - Docker Compose
+# Run with: docker-compose up -d
+
+version: '3.8'
+
+services:
+  forward-curve-hub:
+    build: .
+    container_name: forward-curve-hub
+    restart: unless-stopped
+    ports:
+      - "8766:8766"
+    environment:
+      - PORT=8766
+      - HOST=0.0.0.0
+      - V4_API_URL=https://uncentripetal-derek-euryphagous.ngrok-free.dev
+      - V5_API_URL=http://100.119.255.60:8005
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8766/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+

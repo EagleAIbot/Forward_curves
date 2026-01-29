@@ -1,0 +1,15 @@
+# Forward Curve Hub - Dependencies
+#
+# Institutional-grade forward curve visualization platform
+# Proxies Binance tick data + V4 Forward Curve API
+
+# Web server and WebSocket support
+aiohttp>=3.9.0
+websockets>=12.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# HTTP client for V4 API (included in aiohttp)
+# No ClickHouse required - we use the V4 API directly
+

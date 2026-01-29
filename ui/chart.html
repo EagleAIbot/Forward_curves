@@ -1,0 +1,2813 @@
+<!--
+ * © 2025 Ludwig Strydom. All rights reserved.
+ *
+ * This software and its source code are proprietary and confidential.
+ * Unauthorized copying, distribution, or modification of this file, in
+ * whole or in part, without the express written permission of
+ * Ludwig Strydom is strictly prohibited.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Forward Curve & Calculator</title>
+  <!-- <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script> -->
+  <!-- <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.development.js"></script>
+
+  <script type="module" src="js/predictor.js"></script>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box; /* Prevent width/height overflow from padding/border */
+    }
+    html {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      overflow: hidden; /* Prevent scrollbars on html element */
+      scrollbar-gutter: stable both-edges; /* Reserve space to avoid layout shifts */
+      max-width: 100vw; /* Clamp to viewport to prevent rounding overflow */
+      max-height: 100dvh;
+    }
+
+    /* Hide root scrollbars cross-browser */
+    html, body {
+      -ms-overflow-style: none;     /* IE and old Edge */
+      scrollbar-width: none;        /* Firefox */
+    }
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar {
+      display: none;                /* WebKit */
+    }
+
+    /* Simulation control disabled/enabled states */
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background-color: #666 !important;
+      border-color: #666 !important;
+      color: #999 !important;
+    }
+
+    select:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background-color: #333;
+      color: #666;
+      border-color: #555;
+    }
+
+    button:not(:disabled):hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      transition: all 0.2s ease;
+    }
+
+    select:not(:disabled):hover {
+      border-color: #ff9500;
+      transition: border-color 0.2s ease;
+    }
+
+    body {
+      height: 100dvh; /* Dynamic viewport height avoids UI/banner-induced scrollbars */
+      width: 100vw; /* Lock to viewport width */
+      margin: 0; /* Reset default margin */
+      padding: 0; /* Reset default padding */
+      background-color: #000;
+      color: #ccc;
+      display: flex; /* body is the flex container for panel and chart-area */
+      overflow: clip; /* Stronger than hidden; eliminates scrollbars entirely */
+      font-family: Arial, sans-serif;
+      box-sizing: border-box; /* Ensure padding/border don't add to width/height */
+      position: fixed; /* Prevent page scroll even if children overflow by a pixel */
+      inset: 0; /* top:0; right:0; bottom:0; left:0 */
+      overscroll-behavior: none; /* Prevent overscroll from creating scrollbars */
+      scrollbar-gutter: stable both-edges; /* Avoid transient gutters causing scrollbars */
+      max-width: 100vw; /* Clamp to viewport */
+      max-height: 100dvh;
+    }
+
+    #controls-panel {
+      width: 196px; /* Reduced width by 30% (280px * 0.7) */
+      height: 100%;
+      background-color: #181a1b;
+      padding: 15px; /* Increased padding by 50% (10px * 1.5) */
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 14px; /* Increased gap by ~50% (9px * 1.5 = 13.5px, rounded to 14px) */
+      overflow-y: auto; /* Enable vertical scrolling */
+      overflow-x: hidden; /* Hide horizontal scrollbar */
+      transition: width 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+      z-index: 100;
+      border-right: 1px solid #2a2a2a;
+    }
+
+    /* Hide scrollbar visuals for the panel but keep scrolling */
+    #controls-panel {
+      -ms-overflow-style: none;     /* IE and old Edge */
+      scrollbar-width: none;        /* Firefox */
+    }
+    #controls-panel::-webkit-scrollbar {
+      display: none;                /* WebKit */
+    }
+
+    #controls-panel.hidden {
+      width: 0;
+      padding-left: 0;
+      padding-right: 0;
+      opacity: 0;
+      overflow: hidden;
+      border-right: none;
+    }
+
+    #controls-panel .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px; /* Increased gap by 50% (4px * 1.5) */
+    }
+
+    #controls-panel .inline-group {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    #controls-panel .inline-group label {
+      margin-bottom: 0;
+    }
+
+    #controls-panel .inline-group select,
+    #controls-panel .inline-group .checkbox-group {
+      width: 55%; /* Adjust width as needed */
+      justify-content: flex-end; /* Align items to the right */
+    }
+
+    #controls-panel .inline-group .checkbox-group input {
+      margin: 0;
+    }
+
+    #controls-panel label {
+      font-size: 0.6375em; /* Increased font size by 50% (0.425em * 1.5) */
+      margin-bottom: 3px; /* Increased margin by 50% (2px * 1.5) */
+      color: #bbb;
+      font-weight: 500;
+    }
+
+    #controls-panel select,
+    #controls-panel input[type="number"],
+    #controls-panel button {
+      background: #2c2c2c;
+      color: #ddd;
+      border: 1px solid #444;
+      padding: 8px 9px; /* Increased padding by ~50% (5px*1.5=7.5, 6px*1.5=9) */
+      border-radius: 4px; /* Increased border-radius by ~50% (3px * 1.5 = 4.5px, rounded to 4px) */
+      font-size: 0.675em; /* Increased font size by 50% (0.45em * 1.5) */
+      box-sizing: border-box;
+      width: 100%;
+    }
+
+    #controls-panel input[type="number"] {
+        appearance: textfield; /* Standard property */
+        -moz-appearance: textfield; /* Firefox */
+    }
+
+    #controls-panel input[type="number"]::-webkit-outer-spin-button,
+    #controls-panel input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    #controls-panel button {
+      cursor: pointer;
+      background-color: #007bff;
+      border-color: #007bff;
+      color: white;
+      font-weight: 500;
+      transition: background-color 0.2s ease;
+    }
+
+    #controls-panel button:hover {
+      background-color: #0056b3;
+      border-color: #0056b3;
+    }
+
+    #controls-panel .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 6px; /* Increased gap by 50% (4px * 1.5) */
+        padding: 5px 0; /* Increased padding by ~50% (3px * 1.5 = 4.5px, rounded to 5px) */
+    }
+
+    #controls-panel .checkbox-group input[type="checkbox"] {
+        width: auto;
+        margin-right: 4px; /* Increased margin by ~50% (3px * 1.5 = 4.5px, rounded to 4px) */
+        accent-color: #007bff;
+        background: #2c2c2c; /* Ensure consistent background */
+        border: 1px solid #444; /* Ensure consistent border */
+        vertical-align: middle;
+    }
+
+    #controls-panel .checkbox-group label {
+        margin-bottom: 0;
+        color: #ccc;
+        font-weight: normal;
+        font-size: 0.675em; /* Increased font size by 50% (0.45em * 1.5) */
+        vertical-align: middle;
+    }
+
+    #chart-area {
+      flex: 1;
+      min-height: 300px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      overflow: hidden;
+      contain: layout paint size;
+    }
+
+    #toggle-controls-btn {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 101;
+      background: #2c2c2c;
+      color: #ccc;
+      border: 1px solid #444;
+      padding: 6px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 1.1em;
+      line-height: 1;
+      transition: background-color 0.2s ease, left 0.3s ease;
+    }
+
+    #toggle-controls-btn:hover {
+      background: #3a3a3a;
+    }
+
+    #chart {
+      width: 100%;
+      height: 100%;
+      flex-grow: 1;
+      background-color: #000;
+      min-height: 0; /* Added for robust flex sizing */
+      overflow: hidden; /* Ensure internal content cannot trigger page scroll */
+      contain: layout paint size; /* Isolate layout to avoid rounding-induced scrollbars */
+    }
+
+    /* ============================================ */
+    /* SPREAD MATRIX STYLES */
+    /* ============================================ */
+    #spread-matrix-container {
+      background: rgba(0, 10, 20, 0.95);
+      border: 1px solid rgba(34, 211, 238, 0.2);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+    }
+
+    #spread-matrix-container h3 {
+      color: #22d3ee;
+      font-size: 12px;
+      font-weight: 600;
+      margin: 0 0 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+      font-size: 10px;
+    }
+
+    .matrix-table th,
+    .matrix-table td {
+      padding: 6px 8px;
+      text-align: center;
+      border: 1px solid rgba(34, 211, 238, 0.1);
+    }
+
+    .matrix-table th {
+      background: rgba(34, 211, 238, 0.1);
+      color: #aaa;
+      font-weight: 500;
+    }
+
+    .matrix-table th .price {
+      color: #22d3ee;
+      font-size: 9px;
+      display: block;
+    }
+
+    .matrix-table td.row-header {
+      text-align: left;
+      background: rgba(34, 211, 238, 0.05);
+      color: #aaa;
+      font-weight: 500;
+    }
+
+    .matrix-table td.row-header .price {
+      color: #22d3ee;
+      margin-left: 6px;
+    }
+
+    /* Spread cell color classes */
+    .spread-small { background: rgba(34, 197, 94, 0.3); color: #4ade80; }
+    .spread-medium { background: rgba(234, 179, 8, 0.3); color: #facc15; }
+    .spread-large { background: rgba(249, 115, 22, 0.3); color: #fb923c; }
+    .spread-anomaly { background: rgba(239, 68, 68, 0.5); color: #fca5a5; font-weight: bold; animation: pulse 1s infinite; }
+    .spread-negative { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .matrix-legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 10px;
+      font-size: 10px;
+      color: #888;
+    }
+
+    .matrix-legend .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .matrix-legend .legend-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+    }
+
+    /* ============================================ */
+    /* CALCULATOR STYLES */
+    /* ============================================ */
+    #calculator-panel {
+      background: rgba(0, 10, 20, 0.95);
+      border: 1px solid rgba(34, 211, 238, 0.2);
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    #calculator-panel h3 {
+      color: #22d3ee;
+      font-size: 10px;
+      font-weight: 600;
+      margin: 0 0 8px 0;
+      border-bottom: 1px solid rgba(34, 211, 238, 0.2);
+      padding-bottom: 8px;
+    }
+
+    .calc-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .calc-row label {
+      color: #aaa;
+      font-size: 9px;
+      min-width: 55px;
+    }
+
+    .calc-row select,
+    .calc-row input {
+      flex: 1;
+      background: #1a1a2e;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+    }
+
+    .calc-row select:focus,
+    .calc-row input:focus {
+      border-color: #22d3ee;
+      outline: none;
+    }
+
+    .trade-buttons {
+      display: flex;
+      gap: 6px;
+      margin: 8px 0;
+    }
+
+    .trade-buttons button {
+      flex: 1;
+      padding: 6px;
+      border: none;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .trade-buttons .buy-btn {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+    }
+
+    .trade-buttons .buy-btn:hover {
+      background: linear-gradient(135deg, #34d399, #10b981);
+    }
+
+    .trade-buttons .buy-btn.active {
+      box-shadow: 0 0 0 2px #10b981, 0 0 15px rgba(16, 185, 129, 0.5);
+    }
+
+    .trade-buttons .sell-btn {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+    }
+
+    .trade-buttons .sell-btn:hover {
+      background: linear-gradient(135deg, #f87171, #ef4444);
+    }
+
+    .trade-buttons .sell-btn.active {
+      box-shadow: 0 0 0 2px #ef4444, 0 0 15px rgba(239, 68, 68, 0.5);
+    }
+
+    .calc-results {
+      background: rgba(34, 211, 238, 0.05);
+      border: 1px solid rgba(34, 211, 238, 0.2);
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 8px;
+    }
+
+    .calc-results .result-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      font-size: 9px;
+    }
+
+    .calc-results .result-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .calc-results .result-label {
+      color: #888;
+    }
+
+    .calc-results .result-value {
+      color: #fff;
+      font-weight: 500;
+      font-family: 'SF Mono', monospace;
+    }
+
+    .calc-results .result-value.positive {
+      color: #4ade80;
+    }
+
+    .calc-results .result-value.negative {
+      color: #f87171;
+    }
+
+    /* ============================================ */
+    /* ASSET SELECTOR STYLES */
+    /* ============================================ */
+    #asset-selector {
+      display: flex;
+      gap: 4px;
+      padding: 8px;
+      background: rgba(0, 10, 20, 0.95);
+      border: 1px solid rgba(34, 211, 238, 0.2);
+      border-radius: 8px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .asset-btn {
+      flex: 1;
+      padding: 6px 4px;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: #1a1a2e;
+      color: #888;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      white-space: nowrap;
+      min-width: 0;
+    }
+
+    .asset-btn:hover {
+      border-color: #22d3ee;
+      color: #22d3ee;
+    }
+
+    .asset-btn.active {
+      background: linear-gradient(135deg, #22d3ee, #0891b2);
+      border-color: #22d3ee;
+      color: #000;
+    }
+
+    .asset-btn .asset-icon {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+
+    /* ============================================ */
+    /* NEW LAYOUT - 3 Column */
+    /* ============================================ */
+    #main-content {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #top-bar {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 10px 15px;
+      background: #0a0a0f;
+      border-bottom: 1px solid #222;
+    }
+
+    #center-content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #chart-column {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #right-panel {
+      width: 280px;
+      min-width: 280px;
+      max-width: 280px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      background: #0a0a0f;
+      border-left: 1px solid #222;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* Hide scrollbar for right panel */
+    #right-panel::-webkit-scrollbar {
+      display: none;
+    }
+    #right-panel {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Matrix toggle buttons */
+    .matrix-toggle {
+      display: flex;
+      gap: 4px;
+      margin-left: auto;
+    }
+    .matrix-source-btn {
+      background: #1a1a1f;
+      border: 1px solid #333;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .matrix-source-btn:hover {
+      background: #2a2a2f;
+    }
+    .matrix-source-btn.active {
+      background: #2a2a3f;
+      border-color: currentColor;
+      font-weight: bold;
+    }
+
+    /* ============================================ */
+    /* CURVE ANALYTICS PANEL */
+    /* ============================================ */
+    #curve-analytics-panel {
+      background: rgba(0, 10, 20, 0.95);
+      border: 1px solid rgba(34, 211, 238, 0.2);
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    #curve-analytics-panel h3 {
+      color: #22d3ee;
+      font-size: 10px;
+      font-weight: 600;
+      margin: 0 0 6px 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+    }
+
+    .analytics-card {
+      background: rgba(34, 211, 238, 0.05);
+      border: 1px solid rgba(34, 211, 238, 0.15);
+      border-radius: 4px;
+      padding: 6px 4px;
+      text-align: center;
+    }
+
+    .analytics-card .metric-label {
+      font-size: 7px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 2px;
+    }
+
+    .analytics-card .metric-value {
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'SF Mono', monospace;
+    }
+
+    .analytics-card .metric-sub {
+      font-size: 7px;
+      color: #888;
+      margin-top: 1px;
+    }
+
+    .metric-positive { color: #4ade80; }
+    .metric-negative { color: #f87171; }
+    .metric-neutral { color: #fbbf24; }
+    .metric-cyan { color: #22d3ee; }
+
+    /* ============================================ */
+    /* SIGNAL STATUS BAR */
+    /* ============================================ */
+    #signal-status-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 10px;
+      padding: 6px 8px;
+      background: rgba(0, 10, 20, 0.95);
+      border: 1px solid rgba(34, 211, 238, 0.2);
+      border-radius: 6px;
+      font-size: 10px;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-item .status-label {
+      color: #666;
+      font-size: 8px;
+      text-transform: uppercase;
+    }
+
+    .status-item .status-value {
+      font-weight: 600;
+      font-family: 'SF Mono', monospace;
+      font-size: 10px;
+    }
+
+    .status-divider {
+      width: 1px;
+      height: 16px;
+      background: rgba(34, 211, 238, 0.2);
+    }
+
+    /* Regime badges */
+    .regime-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .regime-trending { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+    .regime-noise { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+    .regime-choppy { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .regime-mean { background: rgba(96, 165, 250, 0.2); color: #60a5fa; }
+
+    /* Direction badges */
+    .direction-bullish { color: #4ade80; }
+    .direction-bearish { color: #f87171; }
+    .direction-neutral { color: #fbbf24; }
+
+    /* Quality indicator */
+    .quality-bar {
+      width: 60px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .quality-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .quality-high { background: #4ade80; }
+    .quality-medium { background: #fbbf24; }
+    .quality-low { background: #f87171; }
+
+    /* Last update timer */
+    .update-timer {
+      color: #888;
+      font-family: 'SF Mono', monospace;
+    }
+
+    .update-timer.stale {
+      color: #f87171;
+      animation: pulse 1s infinite;
+    }
+
+    .update-timer.fresh {
+      color: #4ade80;
+    }
+
+    /* ============================================ */
+    /* SPREAD ALERTS */
+    /* ============================================ */
+    .spread-alerts {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(34, 211, 238, 0.1);
+    }
+
+    .spread-alerts-header {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 8px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .alert-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 6px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 3px;
+      margin-bottom: 3px;
+      font-size: 8px;
+    }
+
+    .alert-item.warning {
+      background: rgba(251, 191, 36, 0.1);
+      border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    .alert-item.info {
+      background: rgba(96, 165, 250, 0.1);
+      border-color: rgba(96, 165, 250, 0.3);
+    }
+
+    .alert-icon {
+      width: 10px;
+      height: 10px;
+      flex-shrink: 0;
+    }
+
+    .alert-text {
+      flex: 1;
+      color: #ccc;
+    }
+
+    .alert-value {
+      font-family: 'SF Mono', monospace;
+      font-weight: 600;
+    }
+
+    .alert-item.warning .alert-value { color: #fbbf24; }
+    .alert-item .alert-value { color: #f87171; }
+    .alert-item.info .alert-value { color: #60a5fa; }
+
+    .no-alerts {
+      font-size: 8px;
+      color: #4ade80;
+      text-align: center;
+      padding: 4px;
+    }
+
+    /* ============================================ */
+    /* ACCURACY TRACKER PANEL */
+    /* ============================================ */
+    #accuracy-tracker-panel {
+      background: rgba(0, 10, 20, 0.95);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    #accuracy-tracker-panel h3 {
+      color: #4ade80;
+      font-size: 10px;
+      font-weight: 600;
+      margin: 0 0 6px 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .accuracy-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .accuracy-score {
+      font-size: 22px;
+      font-weight: 700;
+      font-family: 'SF Mono', monospace;
+    }
+
+    .accuracy-score.high { color: #4ade80; }
+    .accuracy-score.medium { color: #fbbf24; }
+    .accuracy-score.low { color: #f87171; }
+
+    .accuracy-detail {
+      font-size: 8px;
+      color: #888;
+      line-height: 1.4;
+    }
+
+    .accuracy-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+    }
+
+    .accuracy-item {
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.15);
+      border-radius: 3px;
+      padding: 4px;
+      text-align: center;
+    }
+
+    .accuracy-item .horizon-label {
+      font-size: 7px;
+      color: #666;
+    }
+
+    .accuracy-item .accuracy-val {
+      font-size: 10px;
+      font-weight: 600;
+      font-family: 'SF Mono', monospace;
+    }
+
+    .accuracy-item .error-val {
+      font-size: 7px;
+      color: #888;
+    }
+
+    /* ============================================ */
+    /* CURVE DECOMPOSITION PANEL */
+    /* ============================================ */
+    #curve-decomposition-panel {
+      background: rgba(0, 10, 20, 0.95);
+      border: 1px solid rgba(147, 51, 234, 0.3);
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    #curve-decomposition-panel h3 {
+      color: #a78bfa;
+      font-size: 10px;
+      font-weight: 600;
+      margin: 0 0 6px 0;
+    }
+
+    .decomp-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+    }
+
+    .decomp-card {
+      background: rgba(147, 51, 234, 0.08);
+      border: 1px solid rgba(147, 51, 234, 0.15);
+      border-radius: 4px;
+      padding: 6px 4px;
+      text-align: center;
+    }
+
+    .decomp-card .decomp-label {
+      font-size: 7px;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .decomp-card .decomp-value {
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'SF Mono', monospace;
+    }
+
+    .decomp-card .decomp-desc {
+      font-size: 7px;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    /* ============================================ */
+    /* ROLL-DOWN PANEL */
+    /* ============================================ */
+    #rolldown-panel {
+      background: rgba(0, 10, 20, 0.95);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    #rolldown-panel h3 {
+      color: #fbbf24;
+      font-size: 10px;
+      font-weight: 600;
+      margin: 0 0 6px 0;
+    }
+
+    .rolldown-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .rolldown-stat {
+      text-align: center;
+    }
+
+    .rolldown-stat .stat-label {
+      font-size: 7px;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    .rolldown-stat .stat-value {
+      font-size: 14px;
+      font-weight: 600;
+      font-family: 'SF Mono', monospace;
+    }
+
+    .rolldown-divider {
+      width: 1px;
+      height: 30px;
+      background: rgba(251, 191, 36, 0.2);
+    }
+
+    /* ============================================ */
+    /* SCENARIO SLIDER */
+    /* ============================================ */
+    #scenario-slider-panel {
+      background: rgba(0, 10, 20, 0.95);
+      border: 1px solid rgba(96, 165, 250, 0.3);
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    #scenario-slider-panel h3 {
+      color: #60a5fa;
+      font-size: 10px;
+      font-weight: 600;
+      margin: 0 0 6px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .scenario-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .scenario-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      background: rgba(96, 165, 250, 0.2);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    .scenario-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: #60a5fa;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .scenario-value {
+      min-width: 60px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'SF Mono', monospace;
+      text-align: right;
+    }
+
+    .scenario-impact {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+      font-size: 8px;
+    }
+
+    .scenario-impact-item {
+      flex: 1;
+      text-align: center;
+      padding: 4px;
+      background: rgba(96, 165, 250, 0.08);
+      border-radius: 3px;
+    }
+
+    .scenario-impact-item .impact-label {
+      color: #888;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .scenario-impact-item .impact-value {
+      font-weight: 600;
+      font-family: 'SF Mono', monospace;
+    }
+
+  </style>
+</head>
+<body>
+  <!-- Left Controls Panel -->
+  <div id="controls-panel">
+    <!-- Asset Selector at top of controls -->
+    <div id="asset-selector">
+      <button class="asset-btn active" data-asset="BTC">
+        <svg class="asset-icon" viewBox="0 0 24 24" fill="#f7931a"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v2h1c.55 0 1 .45 1 1v3c0 .55-.45 1-1 1h-1v1h2v2h-2v2h-2v-2H9v-2h2v-1H9c-.55 0-1-.45-1-1v-3c0-.55.45-1 1-1h1V7zm0 4v2h3v-2h-3z"/></svg>
+        BTC
+      </button>
+      <button class="asset-btn" data-asset="ETH">
+        <svg class="asset-icon" viewBox="0 0 24 24" fill="#627eea"><path d="M12 1.5l-7 10.5 7 4 7-4-7-10.5zm0 14l-7-4 7 10.5 7-10.5-7 4z"/></svg>
+        ETH
+      </button>
+      <button class="asset-btn" data-asset="SOL">
+        <svg class="asset-icon" viewBox="0 0 24 24" fill="#00ffa3"><circle cx="12" cy="12" r="10" fill="none" stroke="#00ffa3" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="#00ffa3"/></svg>
+        SOL
+      </button>
+    </div>
+
+    <hr style="border-color: #444; margin: 10px 0;">
+
+    <div class="control-group inline-group">
+      <label for="intervalSelector">Interval:</label>
+      <select id="intervalSelector">
+        <option value="60">1m</option>
+        <option value="300" selected>5m</option>
+        <option value="900">15m</option>
+        <option value="3600">1h</option>
+      </select>
+    </div>
+
+    <div class="control-group inline-group">
+        <label for="timeframeSelector">Timeframe:</label>
+        <select id="timeframeSelector">
+          <option value="1" selected>1-Hour</option>
+          <option value="2">2-Hour</option>
+          <option value="4">4-Hour</option>
+        </select>
+    </div>
+
+    <div class="control-group">
+      <button id="loadMoreButton">Load More History</button>
+      <div id="loadingIndicator" style="font-size: 0.675em; color: #999; text-align: center; margin-top: 5px; display: none;">Loading...</div>
+    </div>
+
+    <div class="control-group inline-group">
+      <label for="timezoneSelector">Time Zone:</label>
+      <select id="timezoneSelector">
+        <option value="Local" selected>Local</option>
+        <option value="UTC">UTC</option>
+        <option value="NY">NY</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <button onclick="if(window.chart && window.chart.timeScale) { window.chart.timeScale().fitContent(); }">Reset Zoom</button>
+    </div>
+    <div class="control-group">
+      <button onclick="if(window.chart && window.chart.timeScale) { window.chart.timeScale().scrollToRealTime(); }">Scroll to Latest</button>
+    </div>
+
+    <div class="control-group inline-group">
+      <label for="dimCandlesCheckbox">Dim Candles</label>
+      <div class="checkbox-group">
+        <input type="checkbox" id="dimCandlesCheckbox">
+      </div>
+    </div>
+
+    <div class="control-group inline-group">
+      <label for="showHistoryCheckbox">Show History</label>
+      <div class="checkbox-group">
+        <input type="checkbox" id="showHistoryCheckbox" checked>
+      </div>
+    </div>
+
+    <hr style="border-color: #444; margin: 10px 0;">
+
+    <div class="control-group inline-group">
+      <label for="showV5CurveCheckbox" style="color: #4CAF50;">V5 Curve</label>
+      <div class="checkbox-group">
+        <input type="checkbox" id="showV5CurveCheckbox" checked>
+      </div>
+    </div>
+
+    <div class="control-group inline-group">
+      <label for="showV4CurveCheckbox" style="color: #22d3ee;">V4.32 Curve</label>
+      <div class="checkbox-group">
+        <input type="checkbox" id="showV4CurveCheckbox" checked>
+      </div>
+    </div>
+
+    <div class="control-group inline-group">
+      <label for="showSmoothedCurveCheckbox">Smoothed Curve</label>
+      <div class="checkbox-group">
+        <input type="checkbox" id="showSmoothedCurveCheckbox">
+      </div>
+    </div>
+
+    <div class="control-group inline-group">
+      <label for="interpolationMethodSelect" style="color: #a78bfa;">Interpolation</label>
+      <select id="interpolationMethodSelect" style="font-size: 10px; padding: 2px 4px; background: #1a1a2e; color: #fff; border: 1px solid #444; border-radius: 4px;">
+        <option value="linear">Linear</option>
+        <option value="cubic">Cubic Spline</option>
+        <option value="monotone">Monotone Convex</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Main Content Area -->
+  <div id="main-content">
+    <!-- Center: Chart + Spread Matrix -->
+    <div id="center-content">
+      <div id="chart-column">
+        <div id="chart-area">
+          <button id="toggle-controls-btn">☰</button>
+          <div id="chart"></div>
+        </div>
+
+        <!-- Spread Matrix -->
+        <div id="spread-matrix-container">
+          <h3 style="display: flex; align-items: center; gap: 10px;">
+            Spread Matrix
+            <div class="matrix-toggle">
+              <button id="matrix-v4-btn" class="matrix-source-btn active" style="color: #22d3ee;">V4.32</button>
+              <button id="matrix-v5-btn" class="matrix-source-btn" style="color: #4CAF50;">V5</button>
+            </div>
+          </h3>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 9px; color: #666;">
+            <span>← History</span>
+            <span style="color: #4ade80;">Forward / Future →</span>
+          </div>
+          <table class="matrix-table" id="spread-matrix">
+            <thead>
+              <tr>
+                <th style="min-width: 80px;"></th>
+                <th>+1H<span class="price" id="col-1h-price">-</span></th>
+                <th>+2H<span class="price" id="col-2h-price">-</span></th>
+                <th>+4H<span class="price" id="col-4h-price">-</span></th>
+                <th>+6H<span class="price" id="col-6h-price">-</span></th>
+                <th>+8H<span class="price" id="col-8h-price">-</span></th>
+                <th>+12H<span class="price" id="col-12h-price">-</span></th>
+                <th>+18H<span class="price" id="col-18h-price">-</span></th>
+                <th>+24H<span class="price" id="col-24h-price">-</span></th>
+              </tr>
+            </thead>
+            <tbody id="matrix-body">
+              <!-- Rows will be populated by JavaScript -->
+            </tbody>
+          </table>
+          <div class="matrix-legend">
+            <div class="legend-item"><span class="legend-color" style="background: rgba(34, 197, 94, 0.3);"></span> Small (&lt;0.3%)</div>
+            <div class="legend-item"><span class="legend-color" style="background: rgba(234, 179, 8, 0.3);"></span> Medium (0.3-0.6%)</div>
+            <div class="legend-item"><span class="legend-color" style="background: rgba(249, 115, 22, 0.3);"></span> Large (0.6-1%)</div>
+            <div class="legend-item"><span class="legend-color" style="background: rgba(239, 68, 68, 0.5);"></span> Anomaly (&gt;1%)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Analytics + Calculator -->
+      <div id="right-panel">
+        <!-- Analytics Source Toggle -->
+        <div id="analytics-source-toggle" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: rgba(0, 10, 20, 0.95); border: 1px solid rgba(34, 211, 238, 0.3); border-radius: 6px;">
+          <span style="font-size: 9px; color: #888; text-transform: uppercase;">Analytics Source</span>
+          <div class="matrix-toggle">
+            <button id="analytics-v4-btn" class="matrix-source-btn active" style="color: #22d3ee; font-size: 9px; padding: 4px 10px;">V4.32</button>
+            <button id="analytics-v5-btn" class="matrix-source-btn" style="color: #4CAF50; font-size: 9px; padding: 4px 10px;">V5</button>
+          </div>
+        </div>
+
+        <!-- Signal Status Bar -->
+        <div id="signal-status-bar">
+          <div class="status-item">
+            <span class="status-label">Source</span>
+            <span class="status-value" id="analytics-source-label" style="color: #22d3ee; font-size: 9px;">V4.32</span>
+          </div>
+          <div class="status-divider"></div>
+          <div class="status-item">
+            <span class="status-label">Updated</span>
+            <span class="status-value update-timer" id="last-update-timer">--:--</span>
+          </div>
+          <div class="status-divider"></div>
+          <div class="status-item">
+            <span class="status-label">Direction</span>
+            <span class="status-value direction-neutral" id="signal-direction">--</span>
+          </div>
+          <div class="status-divider"></div>
+          <div class="status-item">
+            <span class="status-label">Regime</span>
+            <span class="regime-badge regime-noise" id="signal-regime">--</span>
+          </div>
+          <div class="status-divider"></div>
+          <div class="status-item">
+            <span class="status-label">Quality</span>
+            <div class="quality-bar">
+              <div class="quality-fill quality-medium" id="quality-fill" style="width: 0%;"></div>
+            </div>
+            <span class="status-value" id="quality-value" style="font-size: 10px; color: #888;">--%</span>
+          </div>
+        </div>
+
+        <!-- Curve Analytics Panel -->
+        <div id="curve-analytics-panel">
+          <h3 style="display: flex; align-items: center; justify-content: space-between;">
+            Curve Analytics
+            <span id="analytics-source-badge" style="font-size: 8px; padding: 2px 6px; background: rgba(34, 211, 238, 0.2); border-radius: 3px; color: #22d3ee;">V4.32 DATA</span>
+          </h3>
+          <div class="analytics-grid">
+            <div class="analytics-card">
+              <div class="metric-label">Steepness</div>
+              <div class="metric-value metric-cyan" id="metric-steepness">--</div>
+              <div class="metric-sub">bps/hr</div>
+            </div>
+            <div class="analytics-card">
+              <div class="metric-label">Convexity</div>
+              <div class="metric-value metric-neutral" id="metric-convexity">--</div>
+              <div class="metric-sub">curve shape</div>
+            </div>
+            <div class="analytics-card">
+              <div class="metric-label">24H Carry</div>
+              <div class="metric-value metric-positive" id="metric-carry">--</div>
+              <div class="metric-sub">roll yield</div>
+            </div>
+          </div>
+          <div class="analytics-grid" style="margin-top: 8px;">
+            <div class="analytics-card">
+              <div class="metric-label">2H-8H Spread</div>
+              <div class="metric-value" id="metric-spread-2-8">--</div>
+              <div class="metric-sub" id="metric-spread-2-8-pct">--%</div>
+            </div>
+            <div class="analytics-card">
+              <div class="metric-label">4H-24H Spread</div>
+              <div class="metric-value" id="metric-spread-4-24">--</div>
+              <div class="metric-sub" id="metric-spread-4-24-pct">--%</div>
+            </div>
+            <div class="analytics-card">
+              <div class="metric-label">Butterfly</div>
+              <div class="metric-value" id="metric-butterfly">--</div>
+              <div class="metric-sub">4H-8H-12H</div>
+            </div>
+          </div>
+
+          <!-- Spread Alerts -->
+          <div class="spread-alerts">
+            <div class="spread-alerts-header">
+              <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              SPREAD ALERTS
+            </div>
+            <div id="spread-alerts-container">
+              <div class="no-alerts">No alerts - spreads within normal range</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Historical Accuracy Tracker -->
+        <div id="accuracy-tracker-panel">
+          <h3>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M9 12l2 2 4-4"/>
+            </svg>
+            V4.32 Prediction Accuracy
+          </h3>
+          <div class="accuracy-main">
+            <div class="accuracy-score high" id="accuracy-overall">--.--%</div>
+            <div class="accuracy-detail" id="accuracy-summary">
+              Predicted vs Actual<br>
+              Based on realized horizons
+            </div>
+          </div>
+          <div id="accuracy-mape" style="font-size: 9px; color: #fbbf24; margin: 4px 0; padding: 4px; background: rgba(251, 191, 36, 0.1); border-radius: 3px; text-align: center;">
+            MAPE: <span id="mape-value">--.--</span>%
+            <span style="font-size: 7px; color: #888; display: block;">Mean Absolute Percentage Error</span>
+          </div>
+          <div id="accuracy-table" style="font-size: 8px; margin-top: 6px;">
+            <!-- Table populated by JavaScript -->
+          </div>
+          <div class="accuracy-grid" id="accuracy-grid" style="margin-top: 6px;">
+            <!-- Populated by JavaScript -->
+          </div>
+        </div>
+
+        <!-- Roll-Down Analysis -->
+        <div id="rolldown-panel">
+          <h3>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2">
+              <path d="M12 19V5M5 12l7-7 7 7"/>
+            </svg>
+            Roll-Down Analysis
+          </h3>
+          <div class="rolldown-main">
+            <div class="rolldown-stat">
+              <div class="stat-label">1H Carry</div>
+              <div class="stat-value metric-positive" id="rolldown-1h">--</div>
+            </div>
+            <div class="rolldown-divider"></div>
+            <div class="rolldown-stat">
+              <div class="stat-label">4H Carry</div>
+              <div class="stat-value metric-positive" id="rolldown-4h">--</div>
+            </div>
+            <div class="rolldown-divider"></div>
+            <div class="rolldown-stat">
+              <div class="stat-label">24H Carry</div>
+              <div class="stat-value metric-positive" id="rolldown-24h">--</div>
+            </div>
+            <div class="rolldown-divider"></div>
+            <div class="rolldown-stat">
+              <div class="stat-label">$/Hour</div>
+              <div class="stat-value metric-cyan" id="rolldown-per-hour">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Curve Decomposition -->
+        <div id="curve-decomposition-panel">
+          <h3>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2">
+              <path d="M4 20h16M4 20V4m0 16l4-4 4 4 4-8 4 4"/>
+            </svg>
+            Curve Change Decomposition
+          </h3>
+          <div class="decomp-grid">
+            <div class="decomp-card">
+              <div class="decomp-label">Parallel</div>
+              <div class="decomp-value metric-cyan" id="decomp-parallel">--</div>
+              <div class="decomp-desc">Entire curve</div>
+            </div>
+            <div class="decomp-card">
+              <div class="decomp-label">Twist</div>
+              <div class="decomp-value metric-positive" id="decomp-twist">--</div>
+              <div class="decomp-desc">Steepening</div>
+            </div>
+            <div class="decomp-card">
+              <div class="decomp-label">Butterfly</div>
+              <div class="decomp-value metric-neutral" id="decomp-butterfly">--</div>
+              <div class="decomp-desc">Curvature</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scenario Slider -->
+        <div id="scenario-slider-panel">
+          <h3>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/>
+            </svg>
+            Scenario Analysis
+            <button id="reset-scenario-btn" style="font-size: 8px; padding: 2px 6px; background: rgba(96, 165, 250, 0.2); border: 1px solid rgba(96, 165, 250, 0.3); border-radius: 3px; color: #60a5fa; cursor: pointer;">Reset</button>
+          </h3>
+          <div class="scenario-controls">
+            <span style="font-size: 8px; color: #888;">-100 bps</span>
+            <input type="range" id="scenario-slider" class="scenario-slider" min="-100" max="100" value="0" step="5">
+            <span style="font-size: 8px; color: #888;">+100 bps</span>
+            <div class="scenario-value" id="scenario-value">0 bps</div>
+          </div>
+          <div class="scenario-impact">
+            <div class="scenario-impact-item">
+              <span class="impact-label">New 24H</span>
+              <span class="impact-value metric-cyan" id="scenario-24h">--</span>
+            </div>
+            <div class="scenario-impact-item">
+              <span class="impact-label">P/L Impact</span>
+              <span class="impact-value" id="scenario-pnl">--</span>
+            </div>
+            <div class="scenario-impact-item">
+              <span class="impact-label">Yield Chg</span>
+              <span class="impact-value" id="scenario-yield">--</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="calculator-panel">
+          <h3>Curve Trade Calculator</h3>
+
+          <div class="calc-row">
+            <label>Strategy:</label>
+            <select id="calc-strategy">
+              <option value="steepener">Steepener</option>
+              <option value="flattener">Flattener</option>
+            </select>
+          </div>
+
+          <div class="trade-buttons">
+            <button class="buy-btn active" id="calc-buy-btn">BUY</button>
+            <button class="sell-btn" id="calc-sell-btn">SELL</button>
+          </div>
+
+          <div class="calc-row">
+            <label>Short Leg:</label>
+            <select id="calc-short-leg">
+              <option value="1">+1H</option>
+              <option value="2" selected>+2H</option>
+              <option value="4">+4H</option>
+              <option value="6">+6H</option>
+            </select>
+          </div>
+
+          <div class="calc-row">
+            <label>Long Leg:</label>
+            <select id="calc-long-leg">
+              <option value="4">+4H</option>
+              <option value="6" selected>+6H</option>
+              <option value="8">+8H</option>
+              <option value="12">+12H</option>
+              <option value="18">+18H</option>
+              <option value="24">+24H</option>
+            </select>
+          </div>
+
+          <div class="calc-row">
+            <label>Notional:</label>
+            <input type="number" id="calc-notional" value="10000" min="100" step="100">
+          </div>
+
+          <div class="calc-results">
+            <div class="result-row">
+              <span class="result-label">Current Spread:</span>
+              <span class="result-value" id="calc-current-spread">-</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">Spread %:</span>
+              <span class="result-value" id="calc-spread-pct">-</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">Short Leg Price:</span>
+              <span class="result-value" id="calc-short-price">-</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">Long Leg Price:</span>
+              <span class="result-value" id="calc-long-price">-</span>
+            </div>
+            <hr style="border-color: rgba(34,211,238,0.2); margin: 8px 0;">
+            <div class="result-row">
+              <span class="result-label">Est. P/L:</span>
+              <span class="result-value" id="calc-pnl">-</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">Yield (Ann.):</span>
+              <span class="result-value" id="calc-yield">-</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 12px; font-size: 9px; color: #666; text-align: center;">
+            <strong>Steepener:</strong> Sell Short / Buy Long<br>
+            <strong>Flattener:</strong> Buy Short / Sell Long
+          </div>
+        </div>
+
+        <!-- Data Source Attribution -->
+        <div style="margin-top: auto; padding: 6px; border-top: 1px solid rgba(34, 211, 238, 0.1); font-size: 7px; color: #555; text-align: center;">
+          <span style="color: #22d3ee;">V4.32</span> · <span style="color: #4CAF50;">V5</span> | Eagle AI Labs
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================
+    // SPREAD MATRIX MANAGER
+    // ============================================
+    const SpreadMatrixManager = {
+      currentSource: 'v4', // 'v4' or 'v5'
+      v4CurveData: null,
+      v5CurveData: null,
+      spotPrice: null,
+      HORIZONS: [0, 1, 2, 4, 6, 8, 12, 18, 24], // 0 = Spot
+      COLUMNS: [1, 2, 4, 6, 8, 12, 18, 24],
+
+      init() {
+        this.buildMatrixRows();
+
+        // Listen for V4 curve updates
+        document.addEventListener('v4curve:update', (e) => {
+          this.v4CurveData = e.detail;
+          if (this.currentSource === 'v4') {
+            this.updateFromCurveData(e.detail);
+          }
+        });
+
+        // Listen for V5 curve updates
+        document.addEventListener('curve:update', (e) => {
+          this.v5CurveData = e.detail;
+          if (this.currentSource === 'v5') {
+            this.updateFromCurveData(e.detail);
+          }
+        });
+
+        // Toggle buttons
+        const v4Btn = document.getElementById('matrix-v4-btn');
+        const v5Btn = document.getElementById('matrix-v5-btn');
+
+        v4Btn?.addEventListener('click', () => {
+          this.currentSource = 'v4';
+          v4Btn.classList.add('active');
+          v5Btn.classList.remove('active');
+          if (this.v4CurveData) this.updateFromCurveData(this.v4CurveData);
+          // Also update calculator
+          if (typeof CalculatorManager !== 'undefined') CalculatorManager.calculate();
+        });
+
+        v5Btn?.addEventListener('click', () => {
+          this.currentSource = 'v5';
+          v5Btn.classList.add('active');
+          v4Btn.classList.remove('active');
+          if (this.v5CurveData) this.updateFromCurveData(this.v5CurveData);
+          // Also update calculator
+          if (typeof CalculatorManager !== 'undefined') CalculatorManager.calculate();
+        });
+      },
+
+      buildMatrixRows() {
+        const tbody = document.getElementById('matrix-body');
+        if (!tbody) return;
+
+        let html = '';
+        for (const rowHorizon of this.HORIZONS) {
+          const rowLabel = rowHorizon === 0 ? 'Spot' : `+${rowHorizon}H`;
+          html += `<tr>
+            <td class="row-header">${rowLabel}<span class="price" id="row-${rowHorizon}h-price">-</span></td>`;
+
+          for (const colHorizon of this.COLUMNS) {
+            const cellId = `cell-${rowHorizon}-${colHorizon}`;
+            html += `<td id="${cellId}" title="">-</td>`;
+          }
+          html += '</tr>';
+        }
+        tbody.innerHTML = html;
+      },
+
+      updateFromCurveData(curveData) {
+        if (!curveData || !curveData.curve) return;
+
+        this.curveData = curveData;
+        this.spotPrice = curveData.current_price || curveData.anchor_price;
+
+        // Build price map from curve data
+        const priceMap = { 0: this.spotPrice };
+        for (const point of curveData.curve) {
+          const hours = parseInt(point.horizon.replace('+', '').replace('H', ''));
+          priceMap[hours] = point.target_price;
+        }
+
+        // Update column headers with prices
+        for (const col of this.COLUMNS) {
+          const priceEl = document.getElementById(`col-${col}h-price`);
+          if (priceEl && priceMap[col]) {
+            priceEl.textContent = '$' + this.formatPrice(priceMap[col]);
+          }
+        }
+
+        // Update row headers with prices
+        for (const row of this.HORIZONS) {
+          const priceEl = document.getElementById(`row-${row}h-price`);
+          if (priceEl && priceMap[row]) {
+            priceEl.textContent = '$' + this.formatPrice(priceMap[row]);
+          }
+        }
+
+        // Update matrix cells
+        for (const rowHorizon of this.HORIZONS) {
+          for (const colHorizon of this.COLUMNS) {
+            const cell = document.getElementById(`cell-${rowHorizon}-${colHorizon}`);
+            if (!cell) continue;
+
+            if (colHorizon <= rowHorizon) {
+              cell.textContent = '';
+              cell.className = '';
+              cell.title = '';
+              continue;
+            }
+
+            const rowPrice = priceMap[rowHorizon];
+            const colPrice = priceMap[colHorizon];
+
+            if (!rowPrice || !colPrice) {
+              cell.textContent = '-';
+              cell.className = '';
+              continue;
+            }
+
+            const spread = colPrice - rowPrice;
+            const spreadPct = (Math.abs(spread) / this.spotPrice) * 100;
+
+            // Format spread
+            const sign = spread >= 0 ? '+' : '';
+            let displaySpread;
+            if (Math.abs(spread) >= 1000) {
+              displaySpread = sign + (spread / 1000).toFixed(1) + 'k';
+            } else {
+              displaySpread = sign + spread.toFixed(0);
+            }
+
+            cell.textContent = displaySpread;
+
+            // Color class based on spread percentage
+            let colorClass = '';
+            if (spreadPct > 1.0) {
+              colorClass = 'spread-anomaly';
+            } else if (spreadPct > 0.6) {
+              colorClass = 'spread-large';
+            } else if (spreadPct > 0.3) {
+              colorClass = 'spread-medium';
+            } else {
+              colorClass = spread >= 0 ? 'spread-small' : 'spread-negative';
+            }
+            cell.className = colorClass;
+
+            // Tooltip
+            const rowLabel = rowHorizon === 0 ? 'Spot' : `${rowHorizon}H`;
+            const colLabel = `${colHorizon}H`;
+            const spreadPctDisplay = ((colPrice - rowPrice) / rowPrice * 100).toFixed(3);
+            cell.title = `${rowLabel} → ${colLabel}: $${spread.toFixed(2)} (${spreadPctDisplay}%)`;
+          }
+        }
+      },
+
+      formatPrice(price) {
+        if (price >= 1000) {
+          return price.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        }
+        return price.toFixed(2);
+      }
+    };
+
+    // ============================================
+    // CALCULATOR MANAGER
+    // ============================================
+    const CalculatorManager = {
+      v4CurveData: null,
+      v5CurveData: null,
+      isBuy: true,
+
+      init() {
+        // Listen for V4 curve updates
+        document.addEventListener('v4curve:update', (e) => {
+          this.v4CurveData = e.detail;
+          this.calculate();
+        });
+
+        // Listen for V5 curve updates
+        document.addEventListener('curve:update', (e) => {
+          this.v5CurveData = e.detail;
+          this.calculate();
+        });
+
+        // Buy/Sell buttons
+        const buyBtn = document.getElementById('calc-buy-btn');
+        const sellBtn = document.getElementById('calc-sell-btn');
+
+        buyBtn?.addEventListener('click', () => {
+          this.isBuy = true;
+          buyBtn.classList.add('active');
+          sellBtn.classList.remove('active');
+          this.calculate();
+        });
+
+        sellBtn?.addEventListener('click', () => {
+          this.isBuy = false;
+          sellBtn.classList.add('active');
+          buyBtn.classList.remove('active');
+          this.calculate();
+        });
+
+        // Strategy and leg changes
+        ['calc-strategy', 'calc-short-leg', 'calc-long-leg', 'calc-notional'].forEach(id => {
+          document.getElementById(id)?.addEventListener('change', () => this.calculate());
+          document.getElementById(id)?.addEventListener('input', () => this.calculate());
+        });
+      },
+
+      calculate() {
+        // Use the same source as SpreadMatrixManager
+        const curveData = SpreadMatrixManager.currentSource === 'v4'
+          ? this.v4CurveData
+          : this.v5CurveData;
+
+        if (!curveData || !curveData.curve) return;
+
+        const strategy = document.getElementById('calc-strategy')?.value || 'steepener';
+        const shortLegHours = parseInt(document.getElementById('calc-short-leg')?.value || '2');
+        const longLegHours = parseInt(document.getElementById('calc-long-leg')?.value || '6');
+        const notional = parseFloat(document.getElementById('calc-notional')?.value || '10000');
+
+        // Get prices from curve
+        const priceMap = {};
+        const spotPrice = curveData.current_price || curveData.anchor_price;
+        priceMap[0] = spotPrice;
+
+        for (const point of curveData.curve) {
+          const hours = parseInt(point.horizon.replace('+', '').replace('H', ''));
+          priceMap[hours] = point.target_price;
+        }
+
+        const shortPrice = priceMap[shortLegHours];
+        const longPrice = priceMap[longLegHours];
+
+        if (!shortPrice || !longPrice) {
+          this.updateDisplay('-', '-', '-', '-', '-', '-');
+          return;
+        }
+
+        // Calculate spread
+        const spread = longPrice - shortPrice;
+        const spreadPct = (spread / spotPrice) * 100;
+
+        // Calculate P/L based on strategy
+        // Steepener: expects curve to steepen (long leg moves more than short)
+        // Flattener: expects curve to flatten (short leg moves more than long)
+        let estimatedPnL;
+        if (strategy === 'steepener') {
+          // Buy long, sell short
+          estimatedPnL = (notional / longPrice) * spread;
+        } else {
+          // Buy short, sell long
+          estimatedPnL = (notional / shortPrice) * (-spread);
+        }
+
+        // Adjust for buy/sell direction
+        if (!this.isBuy) {
+          estimatedPnL = -estimatedPnL;
+        }
+
+        // Calculate annualized yield
+        // Time difference in hours
+        const timeDiff = longLegHours - shortLegHours;
+        const hoursPerYear = 24 * 365;
+        const periodsPerYear = hoursPerYear / timeDiff;
+        const periodReturn = Math.abs(spread) / spotPrice;
+        const annualizedYield = periodReturn * periodsPerYear * 100;
+
+        this.updateDisplay(
+          `$${spread.toFixed(2)}`,
+          `${spreadPct >= 0 ? '+' : ''}${spreadPct.toFixed(4)}%`,
+          `$${shortPrice.toLocaleString()}`,
+          `$${longPrice.toLocaleString()}`,
+          estimatedPnL,
+          annualizedYield
+        );
+      },
+
+      updateDisplay(spread, spreadPct, shortPrice, longPrice, pnl, yieldPct) {
+        document.getElementById('calc-current-spread').textContent = spread;
+        document.getElementById('calc-spread-pct').textContent = spreadPct;
+        document.getElementById('calc-short-price').textContent = shortPrice;
+        document.getElementById('calc-long-price').textContent = longPrice;
+
+        const pnlEl = document.getElementById('calc-pnl');
+        if (pnlEl) {
+          if (typeof pnl === 'number') {
+            pnlEl.textContent = `$${pnl.toFixed(2)}`;
+            pnlEl.className = 'result-value ' + (pnl >= 0 ? 'positive' : 'negative');
+          } else {
+            pnlEl.textContent = pnl;
+            pnlEl.className = 'result-value';
+          }
+        }
+
+        const yieldEl = document.getElementById('calc-yield');
+        if (yieldEl) {
+          if (typeof yieldPct === 'number') {
+            yieldEl.textContent = `${yieldPct.toFixed(2)}%`;
+            yieldEl.className = 'result-value positive';
+          } else {
+            yieldEl.textContent = yieldPct;
+            yieldEl.className = 'result-value';
+          }
+        }
+      }
+    };
+
+    // ============================================
+    // ASSET SELECTOR MANAGER
+    // ============================================
+    const AssetSelectorManager = {
+      currentAsset: 'BTC',
+
+      init() {
+        const buttons = document.querySelectorAll('.asset-btn');
+        buttons.forEach(btn => {
+          btn.addEventListener('click', () => {
+            const asset = btn.dataset.asset;
+            this.selectAsset(asset);
+
+            // Update button states
+            buttons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+          });
+        });
+      },
+
+      selectAsset(asset) {
+        this.currentAsset = asset;
+        console.log(`[AssetSelector] Selected: ${asset}`);
+        // TODO: Implement asset switching when multi-asset support is added
+        // For now, only BTC is supported
+        if (asset !== 'BTC') {
+          alert(`${asset} support coming soon! Currently only BTC is available.`);
+        }
+      }
+    };
+
+    // ============================================
+    // CURVE ANALYTICS MANAGER
+    // ============================================
+    const CurveAnalyticsManager = {
+      currentSource: 'v4', // 'v4' or 'v5'
+      v4CurveData: null,
+      v5CurveData: null,
+      lastV4UpdateTime: null,
+      lastV5UpdateTime: null,
+      timerInterval: null,
+
+      init() {
+        // Listen for V4 curve updates
+        document.addEventListener('v4curve:update', (e) => {
+          this.v4CurveData = e.detail;
+          this.lastV4UpdateTime = Date.now();
+          if (this.currentSource === 'v4') {
+            this.updateAnalytics(e.detail);
+            this.updateSignalStatus(e.detail);
+          }
+        });
+
+        // Listen for V5 updates
+        document.addEventListener('curve:update', (e) => {
+          this.v5CurveData = e.detail;
+          this.lastV5UpdateTime = Date.now();
+          if (this.currentSource === 'v5') {
+            this.updateAnalytics(e.detail);
+            this.updateSignalStatus(e.detail);
+          }
+        });
+
+        // Setup toggle buttons
+        const v4Btn = document.getElementById('analytics-v4-btn');
+        const v5Btn = document.getElementById('analytics-v5-btn');
+        const sourceLabel = document.getElementById('analytics-source-label');
+        const sourceBadge = document.getElementById('analytics-source-badge');
+
+        v4Btn?.addEventListener('click', () => {
+          this.currentSource = 'v4';
+          v4Btn.classList.add('active');
+          v5Btn.classList.remove('active');
+          if (sourceLabel) {
+            sourceLabel.textContent = 'V4.32';
+            sourceLabel.style.color = '#22d3ee';
+          }
+          if (sourceBadge) {
+            sourceBadge.textContent = 'V4.32 DATA';
+            sourceBadge.style.background = 'rgba(34, 211, 238, 0.2)';
+            sourceBadge.style.color = '#22d3ee';
+          }
+          if (this.v4CurveData) {
+            this.updateAnalytics(this.v4CurveData);
+            this.updateSignalStatus(this.v4CurveData);
+          }
+        });
+
+        v5Btn?.addEventListener('click', () => {
+          this.currentSource = 'v5';
+          v5Btn.classList.add('active');
+          v4Btn.classList.remove('active');
+          if (sourceLabel) {
+            sourceLabel.textContent = 'V5';
+            sourceLabel.style.color = '#4CAF50';
+          }
+          if (sourceBadge) {
+            sourceBadge.textContent = 'V5 DATA';
+            sourceBadge.style.background = 'rgba(76, 175, 80, 0.2)';
+            sourceBadge.style.color = '#4CAF50';
+          }
+          if (this.v5CurveData) {
+            this.updateAnalytics(this.v5CurveData);
+            this.updateSignalStatus(this.v5CurveData);
+          }
+        });
+
+        // Start the update timer
+        this.startUpdateTimer();
+      },
+
+      getLastUpdateTime() {
+        return this.currentSource === 'v4' ? this.lastV4UpdateTime : this.lastV5UpdateTime;
+      },
+
+      updateAnalytics(curveData) {
+        if (!curveData || !curveData.curve) return;
+
+        const spotPrice = curveData.current_price || curveData.anchor_price;
+
+        // Build price map
+        const priceMap = { 0: spotPrice };
+        for (const point of curveData.curve) {
+          const hours = parseInt(point.horizon.replace('+', '').replace('H', ''));
+          priceMap[hours] = point.target_price;
+        }
+
+        // Calculate Steepness (bps per hour from spot to 24H)
+        const price24H = priceMap[24];
+        if (price24H && spotPrice) {
+          const totalChangeBps = ((price24H - spotPrice) / spotPrice) * 10000;
+          const steepnessBpsPerHr = totalChangeBps / 24;
+          const steepnessEl = document.getElementById('metric-steepness');
+          if (steepnessEl) {
+            steepnessEl.textContent = steepnessBpsPerHr >= 0
+              ? `+${steepnessBpsPerHr.toFixed(1)}`
+              : steepnessBpsPerHr.toFixed(1);
+            steepnessEl.className = 'metric-value ' + (steepnessBpsPerHr >= 0 ? 'metric-positive' : 'metric-negative');
+          }
+        }
+
+        // Calculate Convexity (curvature: is the curve accelerating or decelerating?)
+        // Using 4H, 12H, 24H points - if middle is above/below straight line = convex/concave
+        const price4H = priceMap[4];
+        const price12H = priceMap[12];
+        if (price4H && price12H && price24H && spotPrice) {
+          // Linear interpolation at 12H
+          const linearAt12H = spotPrice + (price24H - spotPrice) * (12/24);
+          const deviation = ((price12H - linearAt12H) / spotPrice) * 10000; // in bps
+          const convexityEl = document.getElementById('metric-convexity');
+          if (convexityEl) {
+            let shape = 'FLAT';
+            if (deviation > 5) shape = 'CONVEX';
+            else if (deviation < -5) shape = 'CONCAVE';
+            convexityEl.textContent = shape;
+            convexityEl.className = 'metric-value metric-neutral';
+          }
+        }
+
+        // Calculate 24H Carry (roll yield)
+        if (price24H && spotPrice) {
+          const carryPct = ((price24H - spotPrice) / spotPrice) * 100;
+          const carryEl = document.getElementById('metric-carry');
+          if (carryEl) {
+            carryEl.textContent = carryPct >= 0
+              ? `+${carryPct.toFixed(2)}%`
+              : `${carryPct.toFixed(2)}%`;
+            carryEl.className = 'metric-value ' + (carryPct >= 0 ? 'metric-positive' : 'metric-negative');
+          }
+        }
+
+        // 2H-8H Spread
+        const price2H = priceMap[2];
+        const price8H = priceMap[8];
+        if (price2H && price8H) {
+          const spread = price8H - price2H;
+          const spreadPct = (spread / spotPrice) * 100;
+          const spreadEl = document.getElementById('metric-spread-2-8');
+          const spreadPctEl = document.getElementById('metric-spread-2-8-pct');
+          if (spreadEl) {
+            spreadEl.textContent = spread >= 0 ? `+$${spread.toFixed(0)}` : `-$${Math.abs(spread).toFixed(0)}`;
+            spreadEl.className = 'metric-value ' + (spread >= 0 ? 'metric-positive' : 'metric-negative');
+          }
+          if (spreadPctEl) {
+            spreadPctEl.textContent = `${spreadPct >= 0 ? '+' : ''}${spreadPct.toFixed(3)}%`;
+          }
+        }
+
+        // 4H-24H Spread
+        if (price4H && price24H) {
+          const spread = price24H - price4H;
+          const spreadPct = (spread / spotPrice) * 100;
+          const spreadEl = document.getElementById('metric-spread-4-24');
+          const spreadPctEl = document.getElementById('metric-spread-4-24-pct');
+          if (spreadEl) {
+            spreadEl.textContent = spread >= 0 ? `+$${spread.toFixed(0)}` : `-$${Math.abs(spread).toFixed(0)}`;
+            spreadEl.className = 'metric-value ' + (spread >= 0 ? 'metric-positive' : 'metric-negative');
+          }
+          if (spreadPctEl) {
+            spreadPctEl.textContent = `${spreadPct >= 0 ? '+' : ''}${spreadPct.toFixed(3)}%`;
+          }
+        }
+
+        // Butterfly (4H-8H-12H)
+        // Butterfly = 2*middle - front - back
+        if (price4H && price8H && price12H) {
+          const butterfly = 2 * price8H - price4H - price12H;
+          const butterflyBps = (butterfly / spotPrice) * 10000;
+          const butterflyEl = document.getElementById('metric-butterfly');
+          if (butterflyEl) {
+            butterflyEl.textContent = butterflyBps >= 0
+              ? `+${butterflyBps.toFixed(1)}`
+              : butterflyBps.toFixed(1);
+            butterflyEl.className = 'metric-value ' + (Math.abs(butterflyBps) < 10 ? 'metric-neutral' : 'metric-cyan');
+          }
+        }
+
+        // Update spread alerts
+        this.updateSpreadAlerts(priceMap, spotPrice);
+      },
+
+      updateSpreadAlerts(priceMap, spotPrice) {
+        const container = document.getElementById('spread-alerts-container');
+        if (!container) return;
+
+        const alerts = [];
+
+        // Thresholds (in percentage of spot)
+        const THRESHOLDS = {
+          ANOMALY: 1.0,    // > 1% = anomaly
+          HIGH: 0.6,       // > 0.6% = high
+          ELEVATED: 0.3    // > 0.3% = elevated
+        };
+
+        // Check key spreads
+        const spreadsToCheck = [
+          { name: '2H-8H', from: 2, to: 8 },
+          { name: '4H-24H', from: 4, to: 24 },
+          { name: 'Spot-24H', from: 0, to: 24 },
+          { name: '1H-4H', from: 1, to: 4 }
+        ];
+
+        for (const s of spreadsToCheck) {
+          const fromPrice = priceMap[s.from];
+          const toPrice = priceMap[s.to];
+          if (!fromPrice || !toPrice) continue;
+
+          const spread = toPrice - fromPrice;
+          const spreadPct = Math.abs(spread / spotPrice) * 100;
+
+          if (spreadPct >= THRESHOLDS.ANOMALY) {
+            alerts.push({
+              type: 'alert',
+              text: `${s.name} spread at ${spreadPct.toFixed(2)}%`,
+              value: spread >= 0 ? `+$${spread.toFixed(0)}` : `-$${Math.abs(spread).toFixed(0)}`,
+              level: 'anomaly'
+            });
+          } else if (spreadPct >= THRESHOLDS.HIGH) {
+            alerts.push({
+              type: 'warning',
+              text: `${s.name} spread elevated`,
+              value: `${spreadPct.toFixed(2)}%`,
+              level: 'high'
+            });
+          }
+        }
+
+        // Check for inverted curve (bearish signal)
+        if (priceMap[24] && priceMap[0] && priceMap[24] < priceMap[0]) {
+          alerts.push({
+            type: 'info',
+            text: 'Curve inverted - bearish signal',
+            value: `${((priceMap[24] - priceMap[0]) / priceMap[0] * 100).toFixed(2)}%`,
+            level: 'inversion'
+          });
+        }
+
+        // Render alerts
+        if (alerts.length === 0) {
+          container.innerHTML = '<div class="no-alerts">No alerts - spreads within normal range</div>';
+        } else {
+          container.innerHTML = alerts.map(a => `
+            <div class="alert-item ${a.type}">
+              <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                ${a.type === 'alert' ? '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' :
+                  a.type === 'warning' ? '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>' :
+                  '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>'}
+              </svg>
+              <span class="alert-text">${a.text}</span>
+              <span class="alert-value">${a.value}</span>
+            </div>
+          `).join('');
+        }
+      },
+
+      updateSignalStatus(curveData) {
+        // Direction
+        const directionEl = document.getElementById('signal-direction');
+        if (directionEl && curveData.direction) {
+          directionEl.textContent = curveData.direction;
+          directionEl.className = 'status-value direction-' + curveData.direction.toLowerCase();
+        }
+
+        // Regime
+        const regimeEl = document.getElementById('signal-regime');
+        if (regimeEl && curveData.regime) {
+          const regime = curveData.regime.toLowerCase().replace(/_/g, ' ');
+          regimeEl.textContent = regime.toUpperCase();
+
+          // Set badge color
+          let badgeClass = 'regime-badge ';
+          if (curveData.regime.includes('TREND')) badgeClass += 'regime-trending';
+          else if (curveData.regime.includes('NOISE') || curveData.regime.includes('CHOP')) badgeClass += 'regime-choppy';
+          else if (curveData.regime.includes('MEAN')) badgeClass += 'regime-mean';
+          else badgeClass += 'regime-noise';
+          regimeEl.className = badgeClass;
+        }
+
+        // Quality
+        const qualityFill = document.getElementById('quality-fill');
+        const qualityValue = document.getElementById('quality-value');
+        const quality = curveData.curve_quality || curveData.quality || 0;
+        const qualityPct = (quality * 100).toFixed(0);
+
+        if (qualityFill) {
+          qualityFill.style.width = qualityPct + '%';
+          qualityFill.className = 'quality-fill ' +
+            (quality >= 0.7 ? 'quality-high' : quality >= 0.4 ? 'quality-medium' : 'quality-low');
+        }
+        if (qualityValue) {
+          qualityValue.textContent = qualityPct + '%';
+        }
+      },
+
+      startUpdateTimer() {
+        const timerEl = document.getElementById('last-update-timer');
+        if (!timerEl) return;
+
+        this.timerInterval = setInterval(() => {
+          const lastUpdate = this.getLastUpdateTime();
+          if (!lastUpdate) {
+            timerEl.textContent = 'Waiting...';
+            timerEl.className = 'status-value update-timer';
+            return;
+          }
+
+          const elapsed = Math.floor((Date.now() - lastUpdate) / 1000);
+
+          if (elapsed < 60) {
+            timerEl.textContent = elapsed + 's ago';
+          } else if (elapsed < 3600) {
+            timerEl.textContent = Math.floor(elapsed / 60) + 'm ago';
+          } else {
+            timerEl.textContent = Math.floor(elapsed / 3600) + 'h ago';
+          }
+
+          // Stale if > 60 seconds
+          if (elapsed > 60) {
+            timerEl.className = 'status-value update-timer stale';
+          } else if (elapsed < 5) {
+            timerEl.className = 'status-value update-timer fresh';
+          } else {
+            timerEl.className = 'status-value update-timer';
+          }
+        }, 1000);
+      }
+    };
+
+    // ============================================
+    // ACCURACY TRACKER MANAGER
+    // ============================================
+    const AccuracyTrackerManager = {
+      v4CurveData: null,
+      curveHistory: [],  // Store curve snapshots over time
+      maxHistorySize: 50,  // Keep last 50 snapshots (~4 hours at 5min intervals)
+
+      init() {
+        document.addEventListener('v4curve:update', (e) => {
+          this.v4CurveData = e.detail;
+          this.storeCurveSnapshot(e.detail);
+          this.updateAccuracy(e.detail);
+        });
+      },
+
+      // Store each curve update as a snapshot for tracking evolution
+      storeCurveSnapshot(curveData) {
+        if (!curveData || !curveData.curve) return;
+
+        const snapshot = {
+          timestamp: Date.now(),
+          anchorTimestamp: curveData.anchor_timestamp,
+          hoursElapsed: curveData.hours_elapsed || 0,
+          predictions: {}
+        };
+
+        // Store each horizon's prediction at this point in time
+        for (const point of curveData.curve) {
+          snapshot.predictions[point.horizon] = {
+            targetPrice: point.target_price,
+            isActual: point.is_actual,
+            originalPrice: point.original_price
+          };
+        }
+
+        this.curveHistory.push(snapshot);
+
+        // Trim to max size
+        if (this.curveHistory.length > this.maxHistorySize) {
+          this.curveHistory.shift();
+        }
+      },
+
+      // Get the prediction evolution for a horizon
+      getPredictionEvolution(horizon) {
+        const evolution = [];
+        for (const snapshot of this.curveHistory) {
+          const pred = snapshot.predictions[horizon];
+          if (pred && !pred.isActual) {
+            evolution.push({
+              timestamp: snapshot.timestamp,
+              hoursElapsed: snapshot.hoursElapsed,
+              price: pred.targetPrice
+            });
+          }
+        }
+        return evolution;
+      },
+
+      updateAccuracy(curveData) {
+        if (!curveData || !curveData.curve) return;
+
+        // Get all points with original predictions
+        const allPoints = curveData.curve.filter(p => p.original_price);
+        const actualPoints = allPoints.filter(p => p.is_actual);
+        const pendingPoints = allPoints.filter(p => !p.is_actual);
+
+        if (allPoints.length === 0) {
+          document.getElementById('accuracy-overall').textContent = '--.--%';
+          document.getElementById('accuracy-summary').innerHTML = 'Waiting for data...<br>No predictions available';
+          document.getElementById('accuracy-table').innerHTML = '';
+          document.getElementById('accuracy-grid').innerHTML = '<div style="color: #666; font-size: 8px; text-align: center; grid-column: span 4;">No predictions yet</div>';
+          document.getElementById('mape-value').textContent = '--.--';
+          return;
+        }
+
+        // Calculate accuracy for ACTUAL horizons (these have real results)
+        const accuracyResults = [];
+        let totalRawError = 0;
+        let totalStabError = 0;
+        let totalAbsError = 0;
+        let count = 0;
+        let stabCount = 0;
+
+        for (const point of actualPoints) {
+          if (point.original_price && point.target_price) {
+            const raw = point.original_price;  // What we predicted at 13:00 UTC
+            const actual = point.target_price;  // What actually happened
+            // stabilized_price = last prediction before it became actual (from /history endpoint)
+            const stabilized = point.stabilized_price || null;
+
+            // Raw error (original prediction vs actual)
+            const rawError = raw - actual;
+            const rawPctError = (rawError / actual) * 100;
+            const rawAbsPctError = Math.abs(rawPctError);
+
+            // Stabilized error (last prediction before actual vs actual)
+            let stabPctError = null;
+            let stabAbsPctError = null;
+            if (stabilized !== null) {
+              const stabError = stabilized - actual;
+              stabPctError = (stabError / actual) * 100;
+              stabAbsPctError = Math.abs(stabPctError);
+              totalStabError += stabAbsPctError;
+              stabCount++;
+            }
+
+            accuracyResults.push({
+              horizon: point.horizon,
+              raw,
+              stabilized,
+              actual,
+              rawPctError,
+              stabPctError,
+              rawAbsPctError,
+              stabAbsPctError,
+              isActual: true
+            });
+            totalRawError += rawAbsPctError;
+            totalAbsError += Math.abs(rawError);
+            count++;
+          }
+        }
+
+        // Add PENDING horizons (show Raw vs current Stabilized prediction)
+        for (const point of pendingPoints) {
+          if (point.original_price && point.target_price) {
+            const raw = point.original_price;  // What we predicted at 13:00 UTC
+            const stabilized = point.stabilized_price || point.target_price;  // Current stabilized prediction
+            const drift = stabilized - raw;
+            const driftPct = (drift / raw) * 100;
+
+            accuracyResults.push({
+              horizon: point.horizon,
+              raw,
+              stabilized,
+              actual: null,
+              rawPctError: driftPct,  // Show drift as "error" for pending
+              stabPctError: null,
+              isActual: false
+            });
+          }
+        }
+
+        // Sort by horizon order
+        const horizonOrder = ['+1H', '+2H', '+4H', '+6H', '+8H', '+12H', '+18H', '+24H'];
+        accuracyResults.sort((a, b) => horizonOrder.indexOf(a.horizon) - horizonOrder.indexOf(b.horizon));
+
+        if (count === 0) {
+          // No actuals yet, but we have pending predictions
+          document.getElementById('accuracy-overall').textContent = '--.--%';
+          document.getElementById('accuracy-summary').innerHTML = `${pendingPoints.length} pending predictions<br>Waiting for actuals...`;
+        }
+
+        const rawMape = totalRawError / count;  // Raw MAPE
+        const stabMape = stabCount > 0 ? totalStabError / stabCount : null;  // Stabilized MAPE
+        const avgAccuracy = 100 - rawMape;
+        const avgAbsError = totalAbsError / count;  // Mean Absolute Error in $
+
+        const overallEl = document.getElementById('accuracy-overall');
+        if (overallEl) {
+          overallEl.textContent = avgAccuracy.toFixed(2) + '%';
+          overallEl.className = 'accuracy-score ' + (avgAccuracy >= 98 ? 'high' : avgAccuracy >= 95 ? 'medium' : 'low');
+        }
+
+        // Update MAPE display - show both Raw and Stabilized MAPE
+        const mapeEl = document.getElementById('mape-value');
+        if (mapeEl) {
+          if (stabMape !== null) {
+            mapeEl.textContent = rawMape.toFixed(3);
+            // Show improvement if stabilized is better
+            const improvement = rawMape - stabMape;
+            if (improvement > 0) {
+              mapeEl.innerHTML = `${rawMape.toFixed(3)}% <span style="color: #4ade80; font-size: 9px;">→ ${stabMape.toFixed(3)}%</span>`;
+            } else {
+              mapeEl.textContent = rawMape.toFixed(3) + '%';
+            }
+          } else {
+            mapeEl.textContent = rawMape.toFixed(3) + '%';
+          }
+        }
+
+        const summaryEl = document.getElementById('accuracy-summary');
+        if (summaryEl) {
+          summaryEl.innerHTML = `${count} realized horizon${count > 1 ? 's' : ''}<br>MAE: $${avgAbsError.toFixed(0)}`;
+        }
+
+        // Build detailed table showing Raw → Stabilized → Actual with TWO error columns
+        const tableEl = document.getElementById('accuracy-table');
+
+        if (tableEl) {
+          let tableHTML = `
+            <table style="width: 100%; border-collapse: collapse; font-size: 7px;">
+              <thead>
+                <tr style="color: #888; border-bottom: 1px solid #333;">
+                  <th style="text-align: left; padding: 2px;">Hor</th>
+                  <th style="text-align: right; padding: 2px;" title="Original prediction at 13:00 UTC">Raw</th>
+                  <th style="text-align: right; padding: 2px;" title="Last prediction before becoming actual">Stab</th>
+                  <th style="text-align: right; padding: 2px;" title="Final realized price">Actual</th>
+                  <th style="text-align: right; padding: 2px;" title="Raw prediction error">Raw%</th>
+                  <th style="text-align: right; padding: 2px;" title="Stabilized prediction error">Stab%</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+
+          for (const r of accuracyResults) {
+            const rawErrColor = r.rawPctError > 0 ? '#ef4444' : r.rawPctError < 0 ? '#22c55e' : '#888';
+            const rawSign = r.rawPctError > 0 ? '+' : '';
+
+            if (r.isActual) {
+              // ACTUAL: Show Raw, Stabilized, Actual, Raw%, Stab%
+              const hasStabilized = r.stabilized !== null && r.stabPctError !== null;
+              const stabilizedStr = hasStabilized ? '$' + r.stabilized.toLocaleString() : '-';
+
+              // Stab error column
+              let stabErrStr = '-';
+              let stabErrColor = '#666';
+              if (hasStabilized) {
+                const stabSign = r.stabPctError > 0 ? '+' : '';
+                stabErrStr = stabSign + r.stabPctError.toFixed(2) + '%';
+                stabErrColor = r.stabPctError > 0 ? '#ef4444' : r.stabPctError < 0 ? '#22c55e' : '#888';
+
+                // Highlight if stabilized improved the prediction
+                if (r.stabAbsPctError < r.rawAbsPctError) {
+                  stabErrColor = '#4ade80';  // Green = improved
+                }
+              }
+
+              tableHTML += `
+                <tr style="border-bottom: 1px solid #222; background: rgba(74, 222, 128, 0.05);">
+                  <td style="padding: 2px 1px; color: #4ade80;">${r.horizon}</td>
+                  <td style="padding: 2px 1px; text-align: right; color: #a78bfa; font-size: 6px;">$${Math.round(r.raw).toLocaleString()}</td>
+                  <td style="padding: 2px 1px; text-align: right; color: #22d3ee; font-size: 6px;">${hasStabilized ? '$' + Math.round(r.stabilized).toLocaleString() : '-'}</td>
+                  <td style="padding: 2px 1px; text-align: right; color: #4ade80; font-size: 6px;">$${Math.round(r.actual).toLocaleString()}</td>
+                  <td style="padding: 2px 1px; text-align: right; color: ${rawErrColor};">${rawSign}${r.rawPctError.toFixed(2)}%</td>
+                  <td style="padding: 2px 1px; text-align: right; color: ${stabErrColor};">${stabErrStr}</td>
+                </tr>
+              `;
+            } else {
+              // PENDING: Show Raw, Stabilized (current), -, Drift, -
+              const driftColor = r.rawPctError > 0 ? '#22c55e' : r.rawPctError < 0 ? '#ef4444' : '#fbbf24';
+              const driftSign = r.rawPctError > 0 ? '+' : '';
+              tableHTML += `
+                <tr style="border-bottom: 1px solid #222; background: rgba(251, 191, 36, 0.05);">
+                  <td style="padding: 2px 1px; color: #fbbf24;">${r.horizon}</td>
+                  <td style="padding: 2px 1px; text-align: right; color: #a78bfa; font-size: 6px;">$${Math.round(r.raw).toLocaleString()}</td>
+                  <td style="padding: 2px 1px; text-align: right; color: #22d3ee; font-size: 6px;">$${Math.round(r.stabilized).toLocaleString()}</td>
+                  <td style="padding: 2px 1px; text-align: right; color: #666;">-</td>
+                  <td style="padding: 2px 1px; text-align: right; color: ${driftColor};" title="Drift from raw">${driftSign}${r.rawPctError.toFixed(2)}%</td>
+                  <td style="padding: 2px 1px; text-align: right; color: #666;">-</td>
+                </tr>
+              `;
+            }
+          }
+
+          tableHTML += '</tbody></table>';
+          tableHTML += `<div style="font-size: 6px; color: #666; margin-top: 3px; text-align: center;">Raw% = anchor error | Stab% = stabilized error (green = improved)</div>`;
+          tableEl.innerHTML = tableHTML;
+        }
+
+        // Build compact accuracy grid (visual summary)
+        const gridEl = document.getElementById('accuracy-grid');
+        if (gridEl) {
+          gridEl.innerHTML = accuracyResults.map(r => {
+            if (r.isActual) {
+              // Show accuracy for realized horizons (100 - raw error)
+              const accuracy = 100 - r.rawAbsPctError;
+              return `
+                <div class="accuracy-item" style="background: rgba(74, 222, 128, 0.1);">
+                  <div class="horizon-label" style="color: #4ade80;">${r.horizon}</div>
+                  <div class="accuracy-val ${accuracy >= 98 ? 'metric-positive' : accuracy >= 95 ? 'metric-neutral' : 'metric-negative'}">${accuracy.toFixed(1)}%</div>
+                </div>
+              `;
+            } else {
+              // Show drift for pending horizons
+              const driftColor = Math.abs(r.rawPctError) < 0.5 ? '#4ade80' : Math.abs(r.rawPctError) < 1 ? '#fbbf24' : '#ef4444';
+              return `
+                <div class="accuracy-item">
+                  <div class="horizon-label">${r.horizon}</div>
+                  <div class="accuracy-val" style="color: ${driftColor}; font-size: 8px;">±${Math.abs(r.rawPctError).toFixed(1)}%</div>
+                </div>
+              `;
+            }
+          }).join('');
+        }
+      }
+    };
+
+    // ============================================
+    // ROLL-DOWN MANAGER
+    // ============================================
+    const RollDownManager = {
+      init() {
+        document.addEventListener('v4curve:update', (e) => this.update(e.detail));
+        document.addEventListener('curve:update', (e) => this.update(e.detail));
+      },
+
+      update(curveData) {
+        if (!curveData || !curveData.curve) return;
+
+        const spotPrice = curveData.current_price || curveData.anchor_price;
+        const priceMap = { 0: spotPrice };
+        for (const point of curveData.curve) {
+          const hours = parseInt(point.horizon.replace('+', '').replace('H', ''));
+          priceMap[hours] = point.target_price;
+        }
+
+        // 1H Carry (roll from 1H to spot)
+        if (priceMap[1]) {
+          const carry1H = priceMap[1] - spotPrice;
+          const el = document.getElementById('rolldown-1h');
+          if (el) {
+            el.textContent = carry1H >= 0 ? `+$${carry1H.toFixed(0)}` : `-$${Math.abs(carry1H).toFixed(0)}`;
+            el.className = 'stat-value ' + (carry1H >= 0 ? 'metric-positive' : 'metric-negative');
+          }
+        }
+
+        // 4H Carry
+        if (priceMap[4]) {
+          const carry4H = priceMap[4] - spotPrice;
+          const el = document.getElementById('rolldown-4h');
+          if (el) {
+            el.textContent = carry4H >= 0 ? `+$${carry4H.toFixed(0)}` : `-$${Math.abs(carry4H).toFixed(0)}`;
+            el.className = 'stat-value ' + (carry4H >= 0 ? 'metric-positive' : 'metric-negative');
+          }
+        }
+
+        // 24H Carry
+        if (priceMap[24]) {
+          const carry24H = priceMap[24] - spotPrice;
+          const el = document.getElementById('rolldown-24h');
+          if (el) {
+            el.textContent = carry24H >= 0 ? `+$${carry24H.toFixed(0)}` : `-$${Math.abs(carry24H).toFixed(0)}`;
+            el.className = 'stat-value ' + (carry24H >= 0 ? 'metric-positive' : 'metric-negative');
+          }
+        }
+
+        // $ per hour (based on 24H curve slope)
+        if (priceMap[24]) {
+          const perHour = (priceMap[24] - spotPrice) / 24;
+          const el = document.getElementById('rolldown-per-hour');
+          if (el) {
+            el.textContent = perHour >= 0 ? `+$${perHour.toFixed(1)}` : `-$${Math.abs(perHour).toFixed(1)}`;
+            el.className = 'stat-value ' + (perHour >= 0 ? 'metric-positive' : 'metric-negative');
+          }
+        }
+      }
+    };
+
+    // ============================================
+    // CURVE DECOMPOSITION MANAGER
+    // ============================================
+    const CurveDecompositionManager = {
+      previousPriceMap: null,
+
+      init() {
+        document.addEventListener('v4curve:update', (e) => this.update(e.detail));
+        document.addEventListener('curve:update', (e) => this.update(e.detail));
+      },
+
+      update(curveData) {
+        if (!curveData || !curveData.curve) return;
+
+        const spotPrice = curveData.current_price || curveData.anchor_price;
+        const priceMap = { 0: spotPrice };
+        for (const point of curveData.curve) {
+          const hours = parseInt(point.horizon.replace('+', '').replace('H', ''));
+          priceMap[hours] = point.target_price;
+        }
+
+        // If we have previous data, calculate decomposition
+        if (this.previousPriceMap) {
+          const prev = this.previousPriceMap;
+          const curr = priceMap;
+
+          // Parallel shift = average change across all points
+          const changes = [];
+          for (const h of [1, 2, 4, 6, 8, 12, 18, 24]) {
+            if (prev[h] && curr[h]) {
+              changes.push(curr[h] - prev[h]);
+            }
+          }
+          const parallelShift = changes.length > 0 ? changes.reduce((a, b) => a + b, 0) / changes.length : 0;
+
+          // Twist = change in slope (24H vs 1H spread change)
+          const prevSlope = prev[24] && prev[1] ? (prev[24] - prev[1]) / 23 : 0;
+          const currSlope = curr[24] && curr[1] ? (curr[24] - curr[1]) / 23 : 0;
+          const twist = currSlope - prevSlope;
+
+          // Butterfly = change in curvature (8H relative to 4H-12H midpoint)
+          const prevMid = prev[4] && prev[12] ? (prev[4] + prev[12]) / 2 : 0;
+          const currMid = curr[4] && curr[12] ? (curr[4] + curr[12]) / 2 : 0;
+          const prevBfly = prev[8] ? prev[8] - prevMid : 0;
+          const currBfly = curr[8] ? curr[8] - currMid : 0;
+          const butterfly = currBfly - prevBfly;
+
+          // Update UI
+          const parallelEl = document.getElementById('decomp-parallel');
+          if (parallelEl) {
+            const bps = (parallelShift / spotPrice) * 10000;
+            parallelEl.textContent = (bps >= 0 ? '+' : '') + bps.toFixed(1) + ' bps';
+            parallelEl.className = 'decomp-value ' + (bps >= 0 ? 'metric-positive' : 'metric-negative');
+          }
+
+          const twistEl = document.getElementById('decomp-twist');
+          if (twistEl) {
+            const twistBps = (twist / spotPrice) * 10000 * 24; // Annualize-ish
+            twistEl.textContent = (twistBps >= 0 ? '+' : '') + twistBps.toFixed(1) + ' bps';
+            twistEl.className = 'decomp-value ' + (twistBps >= 0 ? 'metric-positive' : 'metric-negative');
+            const descEl = twistEl.nextElementSibling;
+            if (descEl) descEl.textContent = twistBps >= 0 ? 'Steepening' : 'Flattening';
+          }
+
+          const bflyEl = document.getElementById('decomp-butterfly');
+          if (bflyEl) {
+            const bflyBps = (butterfly / spotPrice) * 10000;
+            bflyEl.textContent = (bflyBps >= 0 ? '+' : '') + bflyBps.toFixed(1) + ' bps';
+            bflyEl.className = 'decomp-value ' + (Math.abs(bflyBps) < 5 ? 'metric-neutral' : bflyBps >= 0 ? 'metric-positive' : 'metric-negative');
+          }
+        } else {
+          // First update - show current curve shape instead of changes
+          const parallelEl = document.getElementById('decomp-parallel');
+          const twistEl = document.getElementById('decomp-twist');
+          const bflyEl = document.getElementById('decomp-butterfly');
+          if (parallelEl) parallelEl.textContent = 'Baseline';
+          if (twistEl) twistEl.textContent = 'Baseline';
+          if (bflyEl) bflyEl.textContent = 'Baseline';
+        }
+
+        // Store for next comparison
+        this.previousPriceMap = { ...priceMap };
+      }
+    };
+
+    // ============================================
+    // SCENARIO SLIDER MANAGER
+    // ============================================
+    const ScenarioSliderManager = {
+      currentCurveData: null,
+      spotPrice: null,
+
+      init() {
+        document.addEventListener('v4curve:update', (e) => {
+          this.currentCurveData = e.detail;
+          this.spotPrice = e.detail.current_price || e.detail.anchor_price;
+          this.updateScenario();
+        });
+
+        const slider = document.getElementById('scenario-slider');
+        const resetBtn = document.getElementById('reset-scenario-btn');
+
+        slider?.addEventListener('input', () => this.updateScenario());
+        resetBtn?.addEventListener('click', () => {
+          if (slider) slider.value = 0;
+          this.updateScenario();
+        });
+      },
+
+      updateScenario() {
+        const slider = document.getElementById('scenario-slider');
+        const bpsShift = parseInt(slider?.value || 0);
+
+        // Update value display
+        const valueEl = document.getElementById('scenario-value');
+        if (valueEl) {
+          valueEl.textContent = (bpsShift >= 0 ? '+' : '') + bpsShift + ' bps';
+          valueEl.className = 'scenario-value ' + (bpsShift > 0 ? 'metric-positive' : bpsShift < 0 ? 'metric-negative' : 'metric-cyan');
+        }
+
+        if (!this.currentCurveData || !this.spotPrice) return;
+
+        // Calculate shifted 24H price
+        const priceMap = { 0: this.spotPrice };
+        for (const point of this.currentCurveData.curve) {
+          const hours = parseInt(point.horizon.replace('+', '').replace('H', ''));
+          priceMap[hours] = point.target_price;
+        }
+
+        const original24H = priceMap[24] || this.spotPrice;
+        const shiftAmount = this.spotPrice * (bpsShift / 10000);
+        const new24H = original24H + shiftAmount;
+
+        // Update scenario impact
+        const el24h = document.getElementById('scenario-24h');
+        if (el24h) {
+          el24h.textContent = '$' + new24H.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        }
+
+        // P/L impact (assuming $10k notional on 24H position)
+        const notional = 10000;
+        const pnlImpact = (notional / this.spotPrice) * shiftAmount;
+        const pnlEl = document.getElementById('scenario-pnl');
+        if (pnlEl) {
+          pnlEl.textContent = (pnlImpact >= 0 ? '+' : '') + '$' + pnlImpact.toFixed(0);
+          pnlEl.className = 'impact-value ' + (pnlImpact >= 0 ? 'metric-positive' : 'metric-negative');
+        }
+
+        // Yield change
+        const originalYield = ((original24H - this.spotPrice) / this.spotPrice) * 100 * (365 / 1); // Annualized
+        const newYield = ((new24H - this.spotPrice) / this.spotPrice) * 100 * (365 / 1);
+        const yieldChange = newYield - originalYield;
+        const yieldEl = document.getElementById('scenario-yield');
+        if (yieldEl) {
+          yieldEl.textContent = (yieldChange >= 0 ? '+' : '') + yieldChange.toFixed(0) + '%';
+          yieldEl.className = 'impact-value ' + (yieldChange >= 0 ? 'metric-positive' : 'metric-negative');
+        }
+      }
+    };
+
+    // ============================================
+    // MAIN INITIALIZATION
+    // ============================================
+    document.addEventListener('DOMContentLoaded', () => {
+      const controlsPanel = document.getElementById('controls-panel');
+      const toggleButton = document.getElementById('toggle-controls-btn');
+      const chartElement = document.getElementById('chart');
+      const chartAreaElement = document.getElementById('chart-area');
+
+      // Initialize managers
+      SpreadMatrixManager.init();
+      CalculatorManager.init();
+      AssetSelectorManager.init();
+      CurveAnalyticsManager.init();
+      AccuracyTrackerManager.init();
+      RollDownManager.init();
+      CurveDecompositionManager.init();
+      ScenarioSliderManager.init();
+
+      // Interpolation method selector
+      const interpolationSelect = document.getElementById('interpolationMethodSelect');
+      interpolationSelect?.addEventListener('change', (e) => {
+        const method = e.target.value;
+        if (typeof ChartManager !== 'undefined') {
+          ChartManager.setInterpolationMethod(method);
+          // Re-render curves with new interpolation method
+          ChartManager.reRenderCurves();
+        }
+      });
+
+      let resizeRetryTimeout = null;
+
+      const resizeChart = (attempt = 1) => {
+        if (resizeRetryTimeout) {
+          clearTimeout(resizeRetryTimeout);
+          resizeRetryTimeout = null;
+        }
+
+        if (!chartElement || !chartAreaElement) {
+          console.error('#chart or #chart-area element not found for resize.');
+          return;
+        }
+
+        if (!window.chart || typeof window.chart.resize !== 'function') {
+          console.warn(`window.chart not ready or resize function unavailable (attempt ${attempt}). Retrying shortly...`);
+          if (attempt < 10) {
+            resizeRetryTimeout = setTimeout(() => resizeChart(attempt + 1), 200);
+          }
+          return;
+        }
+
+        const chartDivWidth = chartElement.offsetWidth;
+        const chartDivHeight = chartElement.offsetHeight;
+
+        if (chartDivWidth > 0 && chartDivHeight > 0) {
+          window.chart.resize(chartDivWidth, chartDivHeight);
+        } else {
+          console.warn('ChartDiv has zero width or height. Resize skipped.');
+          if (attempt < 15 && (chartDivWidth === 0 || chartDivHeight === 0)) {
+             resizeRetryTimeout = setTimeout(() => resizeChart(attempt + 1), 250 + attempt * 50);
+          }
+        }
+      };
+
+      if (toggleButton && controlsPanel) {
+        toggleButton.addEventListener('click', () => {
+          controlsPanel.classList.toggle('hidden');
+          const isHidden = controlsPanel.classList.contains('hidden');
+          toggleButton.textContent = isHidden ? '☰' : '✕';
+          setTimeout(() => resizeChart(), 350);
+        });
+      }
+
+      window.addEventListener('resize', () => resizeChart());
+
+      document.addEventListener('chart:ready', () => {
+        console.log('Resizing chart after chart:ready event.');
+        resizeChart();
+      });
+    });
+  </script>
+</body>
+</html>
