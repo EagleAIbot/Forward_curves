@@ -8,8 +8,7 @@ services:
     build: .
     container_name: forward-curve-hub
     restart: unless-stopped
-    ports:
-      - "8766:8766"
+    network_mode: host
     environment:
       - PORT=8766
       - HOST=0.0.0.0
