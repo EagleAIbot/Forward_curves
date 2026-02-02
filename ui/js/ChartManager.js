@@ -2475,6 +2475,32 @@ export const ChartManager = {
   },
 
   /**
+   * Set V4 curve visibility (all V4 series)
+   * @param {boolean} visible - Whether to show V4 curves
+   */
+  setV4CurveVisibility(visible) {
+    console.log(`[ChartManager] V4 curve visibility: ${visible}`);
+    state.v4ForwardCurveSeries?.applyOptions({ visible });
+    state.v4ForwardCurveMarkers?.applyOptions({ visible });
+    state.v4ForwardCurveUpperBand?.applyOptions({ visible });
+    state.v4ForwardCurveLowerBand?.applyOptions({ visible });
+    state.v4OriginalPredictionLine?.applyOptions({ visible });
+    state.v4OriginalPredictionMarkers?.applyOptions({ visible });
+  },
+
+  /**
+   * Set V5 curve visibility (all V5 series)
+   * @param {boolean} visible - Whether to show V5 curves
+   */
+  setV5CurveVisibility(visible) {
+    console.log(`[ChartManager] V5 curve visibility: ${visible}`);
+    state.forwardCurveSeries?.applyOptions({ visible });
+    state.forwardCurveMarkers?.applyOptions({ visible });
+    state.forwardCurveUpperBand?.applyOptions({ visible });
+    state.forwardCurveLowerBand?.applyOptions({ visible });
+  },
+
+  /**
    * Helper function to determine marker specifications based on strategy event data.
    * @param {Object} eventData - The strategy event data
    * @returns {Object} Object containing shape, color, size, and price for the marker

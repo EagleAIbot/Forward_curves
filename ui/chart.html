@@ -785,6 +785,72 @@
     }
 
     /* ============================================ */
+    /* CURVE TOGGLE CONTROLS */
+    /* ============================================ */
+    #curve-toggles {
+      position: absolute;
+      top: 50px;
+      left: 10px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .curve-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(10, 15, 26, 0.9);
+      border: 1px solid rgba(128, 128, 128, 0.3);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .curve-toggle:hover {
+      background: rgba(20, 30, 50, 0.95);
+    }
+
+    .curve-toggle.v4 {
+      border-color: rgba(34, 211, 238, 0.4);
+    }
+
+    .curve-toggle.v5 {
+      border-color: rgba(76, 175, 80, 0.4);
+    }
+
+    .curve-toggle input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: #22d3ee;
+      cursor: pointer;
+    }
+
+    .curve-toggle.v5 input[type="checkbox"] {
+      accent-color: #4CAF50;
+    }
+
+    .curve-toggle .toggle-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+    }
+
+    .curve-toggle.v4 .toggle-label {
+      color: #22d3ee;
+    }
+
+    .curve-toggle.v5 .toggle-label {
+      color: #4CAF50;
+    }
+
+    .curve-toggle input[type="checkbox"]:not(:checked) + .toggle-label {
+      color: #555;
+    }
+
+    /* ============================================ */
     /* SIGNAL STATUS BAR */
     /* ============================================ */
     #signal-status-bar {
@@ -1318,6 +1384,18 @@
               <span>Forward</span>
               <span>►►</span>
             </div>
+          </div>
+
+          <!-- Curve Toggle Controls -->
+          <div id="curve-toggles">
+            <label class="curve-toggle v4">
+              <input type="checkbox" id="toggle-v4-curve" checked>
+              <span class="toggle-label">V4.32</span>
+            </label>
+            <label class="curve-toggle v5">
+              <input type="checkbox" id="toggle-v5-curve" checked>
+              <span class="toggle-label">V5</span>
+            </label>
           </div>
 
           <div id="chart"></div>
@@ -2883,19 +2961,31 @@
 
       updatePosition(xCoordinate) {
         const displayEl = document.getElementById('spot-market-display');
-        if (!displayEl) return;
+        const chartEl = document.getElementById('chart');
+        if (!displayEl || !chartEl) return;
 
         if (xCoordinate !== null && xCoordinate !== undefined) {
           this.currentPositionX = xCoordinate;
-          // Position relative to chart-area, offset to center the display on "NOW"
-          // Add offset for the History label width (~65px) so the spot price box centers on NOW
-          displayEl.style.left = (xCoordinate + 65) + 'px';
+          // The xCoordinate is relative to the chart canvas
+          // The spot-market-display is inside chart-area, and chart is also inside chart-area
+          // So we need to account for the chart element's position within chart-area
+          const chartRect = chartEl.getBoundingClientRect();
+          const chartAreaEl = document.getElementById('chart-area');
+          const chartAreaRect = chartAreaEl?.getBoundingClientRect();
+
+          // Calculate offset: chart's left position relative to chart-area
+          const chartLeftOffset = chartAreaRect ? (chartRect.left - chartAreaRect.left) : 0;
+
+          // Position = chart's left offset + x coordinate from timeScale + half the display width offset
+          // The display is ~250px wide, and we want the center (spot price box) to align with NOW
+          // History box is ~65px, connector is ~12px, so spot box starts at ~77px from left of display
+          const spotBoxCenterOffset = 95; // Approximate center of the spot price box from left edge
+          displayEl.style.left = (chartLeftOffset + xCoordinate + spotBoxCenterOffset) + 'px';
           displayEl.style.transform = 'translateX(-50%)';
           displayEl.style.display = 'flex';
         } else {
-          // If coordinate is null (NOW is not visible), hide or center
-          displayEl.style.left = '50%';
-          displayEl.style.transform = 'translateX(-50%)';
+          // If coordinate is null (NOW is not visible), hide the display
+          displayEl.style.display = 'none';
         }
       },
 
@@ -2968,6 +3058,24 @@
           ChartManager.setInterpolationMethod(method);
           // Re-render curves with new interpolation method
           ChartManager.reRenderCurves();
+        }
+      });
+
+      // V4/V5 Curve Toggle Controls
+      const toggleV4 = document.getElementById('toggle-v4-curve');
+      const toggleV5 = document.getElementById('toggle-v5-curve');
+
+      toggleV4?.addEventListener('change', (e) => {
+        const visible = e.target.checked;
+        if (typeof ChartManager !== 'undefined') {
+          ChartManager.setV4CurveVisibility(visible);
+        }
+      });
+
+      toggleV5?.addEventListener('change', (e) => {
+        const visible = e.target.checked;
+        if (typeof ChartManager !== 'undefined') {
+          ChartManager.setV5CurveVisibility(visible);
         }
       });
 
