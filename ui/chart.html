@@ -2569,11 +2569,13 @@
               if (hasStabilized) {
                 const stabSign = r.stabPctError > 0 ? '+' : '';
                 stabErrStr = stabSign + r.stabPctError.toFixed(2) + '%';
-                stabErrColor = r.stabPctError > 0 ? '#ef4444' : r.stabPctError < 0 ? '#22c55e' : '#888';
 
-                // Highlight if stabilized improved the prediction
+                // Same logic as Raw%: green = overestimated (+), red = underestimated (-)
+                stabErrColor = r.stabPctError > 0 ? '#22c55e' : r.stabPctError < 0 ? '#ef4444' : '#888';
+
+                // If stabilized IMPROVED the prediction (smaller absolute error), use bright green
                 if (r.stabAbsPctError < r.rawAbsPctError) {
-                  stabErrColor = '#4ade80';  // Green = improved
+                  stabErrColor = '#4ade80';  // Bright green = improved over raw
                 }
               }
 
