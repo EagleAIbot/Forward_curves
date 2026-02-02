@@ -1390,11 +1390,19 @@
           <div id="curve-toggles">
             <label class="curve-toggle v4">
               <input type="checkbox" id="toggle-v4-curve" checked>
-              <span class="toggle-label">V4.32</span>
+              <span class="toggle-label">V4.32 Curve</span>
             </label>
             <label class="curve-toggle v5">
               <input type="checkbox" id="toggle-v5-curve" checked>
-              <span class="toggle-label">V5</span>
+              <span class="toggle-label">V5 Curve</span>
+            </label>
+            <label class="curve-toggle v4" style="margin-top: 4px;">
+              <input type="checkbox" id="toggle-v4-box" checked>
+              <span class="toggle-label">V4.32 Box</span>
+            </label>
+            <label class="curve-toggle v5">
+              <input type="checkbox" id="toggle-v5-box" checked>
+              <span class="toggle-label">V5 Box</span>
             </label>
           </div>
 
@@ -3064,6 +3072,8 @@
       // V4/V5 Curve Toggle Controls
       const toggleV4 = document.getElementById('toggle-v4-curve');
       const toggleV5 = document.getElementById('toggle-v5-curve');
+      const toggleV4Box = document.getElementById('toggle-v4-box');
+      const toggleV5Box = document.getElementById('toggle-v5-box');
 
       toggleV4?.addEventListener('change', (e) => {
         const visible = e.target.checked;
@@ -3076,6 +3086,21 @@
         const visible = e.target.checked;
         if (typeof ChartManager !== 'undefined') {
           ChartManager.setV5CurveVisibility(visible);
+        }
+      });
+
+      // V4/V5 Box Toggle Controls (info panels on chart)
+      toggleV4Box?.addEventListener('change', (e) => {
+        const visible = e.target.checked;
+        if (typeof ChartManager !== 'undefined') {
+          ChartManager.setV4BoxVisibility(visible);
+        }
+      });
+
+      toggleV5Box?.addEventListener('change', (e) => {
+        const visible = e.target.checked;
+        if (typeof ChartManager !== 'undefined') {
+          ChartManager.setV5BoxVisibility(visible);
         }
       });
 

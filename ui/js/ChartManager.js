@@ -2475,7 +2475,7 @@ export const ChartManager = {
   },
 
   /**
-   * Set V4 curve visibility (all V4 series and info panel)
+   * Set V4 curve visibility (all V4 series on chart)
    * @param {boolean} visible - Whether to show V4 curves
    */
   setV4CurveVisibility(visible) {
@@ -2486,15 +2486,10 @@ export const ChartManager = {
     state.v4ForwardCurveLowerBand?.applyOptions({ visible });
     state.v4OriginalPredictionLine?.applyOptions({ visible });
     state.v4OriginalPredictionMarkers?.applyOptions({ visible });
-    // Also hide/show the V4 info panel on the chart
-    const v4Panel = document.getElementById('v4-forward-curve-panel');
-    if (v4Panel) {
-      v4Panel.style.display = visible ? 'block' : 'none';
-    }
   },
 
   /**
-   * Set V5 curve visibility (all V5 series and info panel)
+   * Set V5 curve visibility (all V5 series on chart)
    * @param {boolean} visible - Whether to show V5 curves
    */
   setV5CurveVisibility(visible) {
@@ -2503,7 +2498,26 @@ export const ChartManager = {
     state.forwardCurveMarkers?.applyOptions({ visible });
     state.forwardCurveUpperBand?.applyOptions({ visible });
     state.forwardCurveLowerBand?.applyOptions({ visible });
-    // Also hide/show the V5 info panel on the chart
+  },
+
+  /**
+   * Set V4 info box visibility (panel on chart showing horizon prices)
+   * @param {boolean} visible - Whether to show V4 info box
+   */
+  setV4BoxVisibility(visible) {
+    console.log(`[ChartManager] V4 box visibility: ${visible}`);
+    const v4Panel = document.getElementById('v4-forward-curve-panel');
+    if (v4Panel) {
+      v4Panel.style.display = visible ? 'block' : 'none';
+    }
+  },
+
+  /**
+   * Set V5 info box visibility (panel on chart showing horizon prices)
+   * @param {boolean} visible - Whether to show V5 info box
+   */
+  setV5BoxVisibility(visible) {
+    console.log(`[ChartManager] V5 box visibility: ${visible}`);
     const v5Panel = document.getElementById('forward-curve-panel');
     if (v5Panel) {
       v5Panel.style.display = visible ? 'block' : 'none';
