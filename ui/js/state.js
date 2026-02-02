@@ -226,6 +226,12 @@ export const state = {
   /** @type {boolean} */
   historicalCandlesVisible: false,
 
+  /** @type {boolean} - V4 info box visibility (hidden by default) */
+  v4BoxVisible: false,
+
+  /** @type {boolean} - V5 info box visibility (hidden by default) */
+  v5BoxVisible: false,
+
   /** @type {Array} - Last V5 curve points for smoothing */
   lastV5CurvePoints: [],
 
