@@ -15,7 +15,7 @@
   <!-- <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script> -->
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.development.js"></script>
 
-  <script type="module" src="js/predictor.js?v=20260202c"></script>
+  <script type="module" src="js/predictor.js?v=20260202d"></script>
   <style>
     *, *::before, *::after {
       box-sizing: border-box; /* Prevent width/height overflow from padding/border */
@@ -3000,7 +3000,9 @@
         const chartEl = document.getElementById('chart');
         if (!displayEl || !chartEl) return;
 
-        if (xCoordinate !== null && xCoordinate !== undefined) {
+        console.log('[SpotMarketManager] updatePosition called with:', xCoordinate);
+
+        if (xCoordinate !== null && xCoordinate !== undefined && !isNaN(xCoordinate)) {
           this.currentPositionX = xCoordinate;
           // xCoordinate is from chart.timeScale().timeToCoordinate() - relative to chart canvas
           // The spot-market-display is positioned relative to chart-area
@@ -3014,15 +3016,19 @@
           const chartAreaRect = chartAreaEl.getBoundingClientRect();
           const chartLeftOffset = chartRect.left - chartAreaRect.left;
 
-          // Position at the coordinate + chart offset + small adjustment for visual centering
+          // Position at the coordinate + chart offset
           // The display uses transform: translateX(-50%) to center itself
           const adjustedX = chartLeftOffset + xCoordinate;
+          console.log('[SpotMarketManager] chartLeftOffset:', chartLeftOffset, 'adjustedX:', adjustedX);
           displayEl.style.left = adjustedX + 'px';
           displayEl.style.transform = 'translateX(-50%)';
           displayEl.style.display = 'flex';
         } else {
-          // If coordinate is null (NOW is not visible), hide the display
-          displayEl.style.display = 'none';
+          // If coordinate is null (NOW is not visible), center it as fallback
+          console.log('[SpotMarketManager] coordinate is null/undefined, using center fallback');
+          displayEl.style.left = '50%';
+          displayEl.style.transform = 'translateX(-50%)';
+          displayEl.style.display = 'flex';
         }
       },
 

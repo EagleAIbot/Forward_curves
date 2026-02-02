@@ -356,14 +356,18 @@ export const ChartManager = {
     // Function to update NOW position and dispatch event
     const updateSpotPosition = () => {
       if (!state.chart) return;
-      // Use current timestamp (in seconds), aligned to current minute for smoother updates
-      const nowTs = Math.floor(Date.now() / 1000 / 60) * 60;
+      // Use current timestamp (in seconds), aligned to current hour (like Oracle does)
+      const nowHourTs = Math.floor(Date.now() / 1000 / 3600) * 3600;
       // Apply local time shift to match how candles are displayed
-      const shiftedNowTs = shiftTimeStampToLocal(nowTs);
+      const shiftedNowTs = shiftTimeStampToLocal(nowHourTs);
       const coordinate = state.chart.timeScale().timeToCoordinate(shiftedNowTs);
+
+      // Debug logging
+      console.log('[SpotPosition] nowHourTs:', nowHourTs, 'shiftedNowTs:', shiftedNowTs, 'coordinate:', coordinate);
+
       // Dispatch custom event with position
       document.dispatchEvent(new CustomEvent('spotposition:update', {
-        detail: { x: coordinate, timestamp: nowTs }
+        detail: { x: coordinate, timestamp: nowHourTs }
       }));
     };
 
