@@ -6,10 +6,10 @@
  * whole or in part, without the express written permission of
  * Cayman Sunsets Holidays Ltd is strictly prohibited.
  */
-import { ChartManager } from './ChartManager.js?v=20260202b';
-import { UIManager } from './UIManager.js?v=20260202b';
-import { initializeTracing, startActiveSpan } from './tracing.js?v=20260202b';
-import { logger, SERVICE_NAME, ENVIRONMENT } from './state.js?v=20260202b';
+import { ChartManager } from './ChartManager.js?v=20260202c';
+import { UIManager } from './UIManager.js?v=20260202c';
+import { initializeTracing, startActiveSpan } from './tracing.js?v=20260202c';
+import { logger, SERVICE_NAME, ENVIRONMENT } from './state.js?v=20260202c';
 
 // Expose managers globally for inline scripts
 window.ChartManager = ChartManager;

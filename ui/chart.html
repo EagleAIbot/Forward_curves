@@ -15,7 +15,7 @@
   <!-- <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script> -->
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.development.js"></script>
 
-  <script type="module" src="js/predictor.js?v=20260202b"></script>
+  <script type="module" src="js/predictor.js?v=20260202c"></script>
   <style>
     *, *::before, *::after {
       box-sizing: border-box; /* Prevent width/height overflow from padding/border */
@@ -3002,21 +3002,22 @@
 
         if (xCoordinate !== null && xCoordinate !== undefined) {
           this.currentPositionX = xCoordinate;
-          // The xCoordinate is relative to the chart canvas
-          // The spot-market-display is inside chart-area, and chart is also inside chart-area
-          // So we need to account for the chart element's position within chart-area
-          const chartRect = chartEl.getBoundingClientRect();
+          // xCoordinate is from chart.timeScale().timeToCoordinate() - relative to chart canvas
+          // The spot-market-display is positioned relative to chart-area
+          // We need to add the chart element's left offset within chart-area
+
+          // Get chart position relative to chart-area
           const chartAreaEl = document.getElementById('chart-area');
-          const chartAreaRect = chartAreaEl?.getBoundingClientRect();
+          if (!chartAreaEl) return;
 
-          // Calculate offset: chart's left position relative to chart-area
-          const chartLeftOffset = chartAreaRect ? (chartRect.left - chartAreaRect.left) : 0;
+          const chartRect = chartEl.getBoundingClientRect();
+          const chartAreaRect = chartAreaEl.getBoundingClientRect();
+          const chartLeftOffset = chartRect.left - chartAreaRect.left;
 
-          // Position = chart's left offset + x coordinate from timeScale + half the display width offset
-          // The display is ~250px wide, and we want the center (spot price box) to align with NOW
-          // History box is ~65px, connector is ~12px, so spot box starts at ~77px from left of display
-          const spotBoxCenterOffset = 95; // Approximate center of the spot price box from left edge
-          displayEl.style.left = (chartLeftOffset + xCoordinate + spotBoxCenterOffset) + 'px';
+          // Position at the coordinate + chart offset + small adjustment for visual centering
+          // The display uses transform: translateX(-50%) to center itself
+          const adjustedX = chartLeftOffset + xCoordinate;
+          displayEl.style.left = adjustedX + 'px';
           displayEl.style.transform = 'translateX(-50%)';
           displayEl.style.display = 'flex';
         } else {
