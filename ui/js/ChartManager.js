@@ -821,6 +821,11 @@ export const ChartManager = {
       document.getElementById('chart')?.appendChild(panelEl);
     }
 
+    // Respect visibility state from toggle
+    if (state.v5BoxVisible === false) {
+      panelEl.style.display = 'none';
+    }
+
     if (!state.forwardCurveLastUpdated || !state.forwardCurveHorizonData) {
       return;
     }
@@ -903,6 +908,11 @@ export const ChartManager = {
         border: 1px solid rgba(34, 211, 238, 0.3);
       `;
       document.getElementById('chart')?.appendChild(panelEl);
+    }
+
+    // Respect visibility state from toggle
+    if (state.v4BoxVisible === false) {
+      panelEl.style.display = 'none';
     }
 
     if (!state.v4ForwardCurveLastUpdated || !state.v4ForwardCurveHorizonData) {
@@ -2506,7 +2516,9 @@ export const ChartManager = {
    */
   setV4BoxVisibility(visible) {
     console.log(`[ChartManager] V4 box visibility: ${visible}`);
+    state.v4BoxVisible = visible;
     const v4Panel = document.getElementById('v4-forward-curve-panel');
+    console.log(`[ChartManager] V4 panel element:`, v4Panel);
     if (v4Panel) {
       v4Panel.style.display = visible ? 'block' : 'none';
     }
@@ -2518,7 +2530,9 @@ export const ChartManager = {
    */
   setV5BoxVisibility(visible) {
     console.log(`[ChartManager] V5 box visibility: ${visible}`);
+    state.v5BoxVisible = visible;
     const v5Panel = document.getElementById('forward-curve-panel');
+    console.log(`[ChartManager] V5 panel element:`, v5Panel);
     if (v5Panel) {
       v5Panel.style.display = visible ? 'block' : 'none';
     }
