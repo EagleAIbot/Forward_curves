@@ -224,7 +224,7 @@ export const state = {
   smoothedCurvesVisible: false,
 
   /** @type {boolean} */
-  historicalCandlesVisible: true,
+  historicalCandlesVisible: false,
 
   /** @type {Array} - Last V5 curve points for smoothing */
   lastV5CurvePoints: [],

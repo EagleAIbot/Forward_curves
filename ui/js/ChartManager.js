@@ -112,7 +112,8 @@ export const ChartManager = {
       borderDownColor:'rgba(239,83,80,1)',
       wickUpColor:    'rgba(38,166,154,1)',
       wickDownColor:  'rgba(239,83,80,1)',
-      borderVisible: true
+      borderVisible: true,
+      visible: state.historicalCandlesVisible  // Hidden by default (false)
     });
 
     this.createTooltipElement();
