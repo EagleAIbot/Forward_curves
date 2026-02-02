@@ -817,8 +817,10 @@ export const ChartManager = {
         max-height: 300px;
         overflow-y: auto;
         min-width: 200px;
+        cursor: move;
       `;
       document.getElementById('chart')?.appendChild(panelEl);
+      this.makeDraggable(panelEl);
     }
 
     // Respect visibility state from toggle
@@ -906,8 +908,10 @@ export const ChartManager = {
         overflow-y: auto;
         min-width: 200px;
         border: 1px solid rgba(34, 211, 238, 0.3);
+        cursor: move;
       `;
       document.getElementById('chart')?.appendChild(panelEl);
+      this.makeDraggable(panelEl);
     }
 
     // Respect visibility state from toggle
@@ -935,10 +939,10 @@ export const ChartManager = {
       V4.32 Updated: ${timeStr}
     </div>`;
 
-    // Show anchor info
+    // Show liquidity fixing info
     if (anchorStr) {
       html += `<div style="color: #10b981; font-size: 9px; margin-bottom: 6px;">
-        🔒 Anchor: ${anchorStr} (${hoursElapsed}h elapsed)
+        🔒 Liq Fix: ${anchorStr} (${hoursElapsed}h elapsed)
       </div>`;
     }
 
@@ -1516,7 +1520,7 @@ export const ChartManager = {
                   <div style="font-weight: bold; margin-bottom: 5px; color: #22d3ee;">
                     V4.32 Curve ${horizonData.horizon}${isActual}
                   </div>
-                  <div>Anchor Price: $${horizonData.current_price?.toLocaleString()}</div>
+                  <div>Liq Fix Price: $${horizonData.current_price?.toLocaleString()}</div>
                   <div>Predicted: <span style="color: ${pctColor}; font-weight: bold;">$${horizonData.target_price?.toLocaleString()}</span></div>
                   <div style="color: ${pctColor};">Change: ${pctChange}%</div>
                 `;
@@ -2536,6 +2540,52 @@ export const ChartManager = {
     if (v5Panel) {
       v5Panel.style.display = visible ? 'block' : 'none';
     }
+  },
+
+  /**
+   * Make an element draggable within its parent container
+   * @param {HTMLElement} element - The element to make draggable
+   */
+  makeDraggable(element) {
+    let isDragging = false;
+    let startX, startY, startLeft, startTop;
+
+    element.addEventListener('mousedown', (e) => {
+      // Only drag from the element itself, not from child elements that might have their own interactions
+      if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') {
+        return;
+      }
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+
+      // Get current position
+      const rect = element.getBoundingClientRect();
+      const parentRect = element.parentElement.getBoundingClientRect();
+      startLeft = rect.left - parentRect.left;
+      startTop = rect.top - parentRect.top;
+
+      // Switch to left/top positioning
+      element.style.right = 'auto';
+      element.style.left = startLeft + 'px';
+      element.style.top = startTop + 'px';
+
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+
+      element.style.left = (startLeft + deltaX) + 'px';
+      element.style.top = (startTop + deltaY) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
   },
 
   /**
