@@ -682,6 +682,7 @@
       align-items: center;
       gap: 6px;
       pointer-events: none;
+      transition: left 0.15s ease-out;
     }
 
     .spot-label-box {
@@ -2862,6 +2863,7 @@
     // ============================================
     const SpotMarketManager = {
       lastPrice: null,
+      currentPositionX: null,
 
       init() {
         // Listen for V4 curve updates (primary source)
@@ -2870,6 +2872,29 @@
         document.addEventListener('curve:update', (e) => {
           if (!this.lastPrice) this.updateSpotPrice(e.detail);
         });
+
+        // Listen for spot position updates from ChartManager (pan/zoom tracking)
+        document.addEventListener('spotposition:update', (e) => {
+          this.updatePosition(e.detail.x);
+        });
+      },
+
+      updatePosition(xCoordinate) {
+        const displayEl = document.getElementById('spot-market-display');
+        if (!displayEl) return;
+
+        if (xCoordinate !== null && xCoordinate !== undefined) {
+          this.currentPositionX = xCoordinate;
+          // Position relative to chart-area, offset to center the display on "NOW"
+          // Add offset for the History label width (~65px) so the spot price box centers on NOW
+          displayEl.style.left = (xCoordinate + 65) + 'px';
+          displayEl.style.transform = 'translateX(-50%)';
+          displayEl.style.display = 'flex';
+        } else {
+          // If coordinate is null (NOW is not visible), hide or center
+          displayEl.style.left = '50%';
+          displayEl.style.transform = 'translateX(-50%)';
+        }
       },
 
       updateSpotPrice(curveData) {

@@ -349,6 +349,38 @@ export const ChartManager = {
 
     state.markersAPI = window.LightweightCharts.createSeriesMarkers(state.candleSeries, state.seriesMarkers);
 
+    // ============================================
+    // SPOT POSITION TRACKING (for spot market display)
+    // ============================================
+
+    // Function to update NOW position and dispatch event
+    const updateSpotPosition = () => {
+      if (!state.chart) return;
+      const nowHourTs = Math.floor(Date.now() / 1000 / 3600) * 3600;
+      const coordinate = state.chart.timeScale().timeToCoordinate(nowHourTs);
+      // Dispatch custom event with position
+      document.dispatchEvent(new CustomEvent('spotposition:update', {
+        detail: { x: coordinate, timestamp: nowHourTs }
+      }));
+    };
+
+    // Subscribe to time scale changes (pan/zoom)
+    state.chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+      updateSpotPosition();
+    });
+
+    // Also update on resize
+    const resizeObserver = new ResizeObserver(() => {
+      setTimeout(updateSpotPosition, 50);
+    });
+    const chartEl = document.getElementById('chart');
+    if (chartEl) {
+      resizeObserver.observe(chartEl);
+    }
+
+    // Initial position update after chart settles
+    setTimeout(updateSpotPosition, 100);
+
   },
 
   /**
