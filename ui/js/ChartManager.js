@@ -2095,10 +2095,8 @@ export const ChartManager = {
       visible: visible
     });
 
-    // Also toggle the close price series
-    if (state.closePriceSeries) {
-      state.closePriceSeries.applyOptions({ visible: visible });
-    }
+    // NOTE: Do NOT toggle closePriceSeries here - it's a shifted line used for predictions
+    // and should be controlled separately via showClosePriceLine state
 
     // Store visibility state
     state.historicalCandlesVisible = visible;
