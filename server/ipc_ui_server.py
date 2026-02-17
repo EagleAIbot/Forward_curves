@@ -41,6 +41,7 @@ SSL_CONTEXT.verify_mode = ssl.CERT_NONE
 # Import Forward Curve Providers
 from v5_curve_provider import V5CurveProvider
 from v4_curve_provider import V4CurveProvider
+from accuracy_storage import AccuracyStorage
 
 # Load environment variables
 load_dotenv()
@@ -80,6 +81,9 @@ class ForwardCurveServer:
 
         # V4 Forward Curve Provider
         self.v4_curve_provider: V4CurveProvider | None = None
+
+        # Accuracy Storage
+        self.accuracy_storage: AccuracyStorage | None = None
 
         self.heartbeat_task: asyncio.Task | None = None
         self.runtime_id: str = ""  # Will be set in start()
@@ -211,6 +215,13 @@ class ForwardCurveServer:
         num_clients = len(self.ws_clients)
         await self.broadcast(curve_data)
 
+        # Store accuracy data
+        if self.accuracy_storage:
+            try:
+                self.accuracy_storage.store_v4_data(curve_data)
+            except Exception as e:
+                self.log("ERROR", f"[V4] Accuracy storage error: {e}")
+
         price = curve_data.get("current_price", 0)
         regime = curve_data.get("regime", "?")
         quality = curve_data.get("curve_quality", 0)
@@ -258,6 +269,18 @@ class ForwardCurveServer:
             if summary:
                 return web.json_response(summary)
         return web.json_response({"error": "Summary not available"}, status=503)
+
+    async def handle_accuracy_stats(self, request: web.Request) -> web.Response:
+        """Get V4 accuracy statistics."""
+        days = int(request.query.get("days", "30"))
+        if self.accuracy_storage:
+            try:
+                summary = self.accuracy_storage.get_accuracy_summary(days)
+                return web.json_response(summary)
+            except Exception as e:
+                self.log("ERROR", f"Error fetching accuracy stats: {e}")
+                return web.json_response({"error": str(e)}, status=500)
+        return web.json_response({"error": "Accuracy storage not available"}, status=503)
 
     # ============================================
     # 4. WEBSOCKET BROADCAST
@@ -399,6 +422,9 @@ class ForwardCurveServer:
         self.app.router.add_get("/api/curve/current", self.handle_curve_current)
         self.app.router.add_get("/api/curve/history", self.handle_curve_history)
         self.app.router.add_get("/api/curve/summary", self.handle_curve_summary)
+        
+        # Accuracy API endpoint
+        self.app.router.add_get("/api/accuracy", self.handle_accuracy_stats)
 
         # WebSocket
         self.app.router.add_get("/ws", self.handle_websocket)
@@ -427,17 +453,27 @@ class ForwardCurveServer:
         self.runtime_id = f"{hostname}-{pid}-{int(datetime.now(UTC).timestamp())}"
         self.log("INFO", f"Runtime ID: {self.runtime_id}")
 
-        # Initialize V5 Forward Curve Provider
-        self.log("INFO", "Initializing V5 Forward Curve Provider...")
+        # Initialize V5 Forward Curve Provider - DISABLED (100% bullish issue)
+        self.log("INFO", "V5 Forward Curve Provider DISABLED")
+        self.curve_provider = None
+        # try:
+        #     self.curve_provider = V5CurveProvider(
+        #         log_callback=lambda level, msg: self.log(level, f"[V5] {msg}"),
+        #         poll_interval=300.0,  # Poll every 5 minutes (model updates every 5 mins)
+        #     )
+        #     self.log("INFO", "✓ V5 Forward Curve Provider initialized")
+        # except Exception as e:
+        #     self.log("ERROR", f"Failed to initialize curve provider: {e}")
+        #     self.curve_provider = None
+
+        # Initialize Accuracy Storage
+        self.log("INFO", "Initializing Accuracy Storage...")
         try:
-            self.curve_provider = V5CurveProvider(
-                log_callback=lambda level, msg: self.log(level, f"[V5] {msg}"),
-                poll_interval=300.0,  # Poll every 5 minutes (model updates every 5 mins)
-            )
-            self.log("INFO", "✓ V5 Forward Curve Provider initialized")
+            self.accuracy_storage = AccuracyStorage()
+            self.log("INFO", "✓ Accuracy Storage initialized")
         except Exception as e:
-            self.log("ERROR", f"Failed to initialize curve provider: {e}")
-            self.curve_provider = None
+            self.log("ERROR", f"Failed to initialize accuracy storage: {e}")
+            self.accuracy_storage = None
 
         # Initialize V4 Forward Curve Provider
         self.log("INFO", "Initializing V4.32 Forward Curve Provider...")
@@ -458,10 +494,10 @@ class ForwardCurveServer:
         self.log("INFO", "Starting Binance tick stream...")
         self.binance_ws_task = asyncio.create_task(self.start_binance_tick_stream())
 
-        # Start V5 curve polling
-        if self.curve_provider:
-            self.log("INFO", "Starting V5 forward curve polling...")
-            await self.curve_provider.start_polling(self.broadcast_curve)
+        # Start V5 curve polling - DISABLED
+        # if self.curve_provider:
+        #     self.log("INFO", "Starting V5 forward curve polling...")
+        #     await self.curve_provider.start_polling(self.broadcast_curve)
 
         # Start V4 curve polling
         if self.v4_curve_provider:

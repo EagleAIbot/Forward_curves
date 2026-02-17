@@ -33,3 +33,6 @@ dist/
 build/
 *.egg-info/
 
+
+# Accuracy database (local data)
+server/v4_accuracy.db
