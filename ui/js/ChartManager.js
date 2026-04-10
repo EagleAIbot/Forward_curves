@@ -578,6 +578,22 @@ export const ChartManager = {
         anchorStr += 'Z';
       }
       anchorTime = Math.floor(new Date(anchorStr).getTime() / 1000);
+
+      // STALENESS CHECK: if anchor is more than 26 hours old, clear series and bail out
+      // This prevents LightweightCharts from crashing when rendering far-past data points
+      const nowSec = Math.floor(Date.now() / 1000);
+      const anchorAgeHours = (nowSec - anchorTime) / 3600;
+      if (anchorAgeHours > 26) {
+        console.warn(`[V4 Curve] Stale data detected - anchor is ${anchorAgeHours.toFixed(1)}h old, clearing series`);
+        state.v4ForwardCurveSeries?.setData([]);
+        state.v4ForwardCurveUpperBand?.setData([]);
+        state.v4ForwardCurveLowerBand?.setData([]);
+        state.v4ForwardCurveMarkers?.setData([]);
+        state.v4OriginalPredictionLine?.setData([]);
+        state.v4ActualPriceLine?.setData([]);
+        if (state.v4SmoothedCurveSeries) state.v4SmoothedCurveSeries.setData([]);
+        return;
+      }
       console.log('[V4 Curve] Anchor timestamp:', curveData.anchor_timestamp, '-> anchorTime:', anchorTime, '-> Date:', new Date(anchorTime * 1000).toISOString());
     } else {
       // Fallback to current hour if no anchor
@@ -681,9 +697,14 @@ export const ChartManager = {
     }
 
     // Update the V4 series with interpolated data
-    state.v4ForwardCurveSeries?.setData(curvePoints);
-    state.v4ForwardCurveUpperBand?.setData(upperBandPoints);
-    state.v4ForwardCurveLowerBand?.setData(lowerBandPoints);
+    // Filter out any null/undefined values to prevent LightweightCharts "Value is null" crash
+    const validCurvePoints = curvePoints.filter(p => p && p.time != null && p.value != null && isFinite(p.value));
+    const validUpperPoints = upperBandPoints.filter(p => p && p.time != null && p.value != null && isFinite(p.value));
+    const validLowerPoints = lowerBandPoints.filter(p => p && p.time != null && p.value != null && isFinite(p.value));
+
+    state.v4ForwardCurveSeries?.setData(validCurvePoints);
+    state.v4ForwardCurveUpperBand?.setData(validUpperPoints);
+    state.v4ForwardCurveLowerBand?.setData(validLowerPoints);
 
     // Store curve points for later smoothing toggle
     state.lastV4CurvePoints = curvePoints;
