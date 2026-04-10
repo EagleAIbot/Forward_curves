@@ -15,8 +15,8 @@ from typing import Any, Optional, Callable
 class V4CurveProvider:
     """Provider for V4.32 forward curve data."""
 
-    # V4 API via ngrok
-    V4_BASE_URL = "https://uncentripetal-derek-euryphagous.ngrok-free.dev"
+    # V4 API via Tailscale direct (ngrok was unreliable - dies when DGX sleeps)
+    V4_BASE_URL = "http://100.119.255.60:8042"
     
     # Horizons in order (V4 has 8 horizons up to 24H) - with + prefix as returned by API
     HORIZONS = ["+1H", "+2H", "+4H", "+6H", "+8H", "+12H", "+18H", "+24H"]
